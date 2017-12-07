@@ -1,0 +1,47 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:map="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="com.google.firebase.udacity.friendlychat.MapsFragment" />
+
+    <Button
+        android:id="@+id/startButton"
+        android:layout_width="288dp"
+        android:layout_height="88dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="12dp"
+        android:layout_marginLeft="12dp"
+        android:drawableRight="@drawable/ic_walk_white_24dp"
+        android:elevation="8dp"
+        android:padding="32dp"
+        android:text="Start My Hike"
+        android:textColor="@android:color/white"
+        android:textSize="20sp" />
+
+    <Button
+        android:id="@+id/finishedButton"
+        android:layout_width="288dp"
+        android:layout_height="88dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="12dp"
+        android:layout_marginLeft="12dp"
+        android:drawableRight="@drawable/ic_check_white_24dp"
+        android:elevation="8dp"
+        android:padding="32dp"
+        android:text="Finish Hike"
+        android:textColor="@android:color/white"
+        android:textSize="20sp"
+        android:visibility="invisible" />
+
+</FrameLayout>
