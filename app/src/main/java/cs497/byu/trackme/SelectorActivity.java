@@ -9,6 +9,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.udacity.friendlychat.R;
 
 import cs497.byu.trackme.model.ProfileData;
@@ -24,6 +25,7 @@ public class SelectorActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         hideActionBar();
         setContentView(R.layout.activity_selection);
+
 
         mHikeOption = (LinearLayout) findViewById(R.id.hike);
         mHikeOption.setOnClickListener(new View.OnClickListener() {

@@ -33,6 +33,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -94,10 +95,10 @@ public class MapsFragment extends Fragment
         mapFrag = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
         mapFrag.getMapAsync(this);
 
-        mFirebaseDatabase = FirebaseDatabase.getInstance();
-        mMessageDataBaseReference = mFirebaseDatabase.getReference().child("location");
-
-        attachDatabaseReadListener();
+//        mFirebaseDatabase = FirebaseDatabase.getInstance();
+//        mMessageDataBaseReference = mFirebaseDatabase.getReference().child("location");
+//
+//        attachDatabaseReadListener();
 
         updateValuesFromBundle(savedInstanceState);
 

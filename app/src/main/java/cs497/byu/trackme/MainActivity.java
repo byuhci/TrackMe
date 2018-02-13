@@ -15,17 +15,18 @@ import com.google.firebase.udacity.friendlychat.R;
 
 public class MainActivity extends AppCompatActivity {
 
+    private MapsFragment mapsFragment;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FacebookSdk.sdkInitialize(getApplicationContext());
+//        FacebookSdk.sdkInitialize(getApplicationContext());
         setContentView(R.layout.activity_main);
 
         mapsFragment = new MapsFragment();
         getSupportFragmentManager().beginTransaction().add(R.id.content, mapsFragment).commit();
     }
 
-    private MapsFragment mapsFragment;
 
 
 
