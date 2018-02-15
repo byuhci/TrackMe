@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "939651065472",
+    "project_id": "trackme-8f24a"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:939651065472:android:b323a55763d58a19",
+        "android_client_info": {
+          "package_name": "cs497.byu.trackme"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "939651065472-ql0d3taoo6cbhtlssh7m0br4tbo56ihj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnN6EGbs1Yl1Z0L7s4dl-7FC3z2_RqWIQ"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 1
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

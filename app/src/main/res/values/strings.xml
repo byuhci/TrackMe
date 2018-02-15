@@ -84,4 +84,6 @@
     <string name="title_home">Home</string>
     <string name="title_dashboard">Dashboard</string>
     <string name="title_activity_test">test</string>
+
+    <string name="facebook_app_id">1453216041471294</string>
 </resources>

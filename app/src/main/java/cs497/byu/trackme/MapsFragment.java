@@ -95,10 +95,11 @@ public class MapsFragment extends Fragment
         mapFrag = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
         mapFrag.getMapAsync(this);
 
-//        mFirebaseDatabase = FirebaseDatabase.getInstance();
-//        mMessageDataBaseReference = mFirebaseDatabase.getReference().child("location");
+        FirebaseApp.initializeApp(getActivity());
+        mFirebaseDatabase = FirebaseDatabase.getInstance("https://friendlychat-3e92d.firebaseio.com/");
+        mMessageDataBaseReference = mFirebaseDatabase.getReference().child("location");
 //
-//        attachDatabaseReadListener();
+        attachDatabaseReadListener();
 
         updateValuesFromBundle(savedInstanceState);
 
