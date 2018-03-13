@@ -1,15 +1,23 @@
 package cs497.byu.trackme;
 
+import android.Manifest;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.location.Location;
+import android.media.ThumbnailUtils;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -42,10 +50,15 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.udacity.friendlychat.R;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
 import cs497.byu.trackme.com.hs.gpxparser.modal.GPX;
@@ -53,6 +66,7 @@ import cs497.byu.trackme.com.hs.gpxparser.modal.Waypoint;
 import cs497.byu.trackme.model.LocationMarker;
 import cs497.byu.trackme.model.ProfileData;
 
+import static android.app.Activity.RESULT_OK;
 import static com.facebook.FacebookSdk.getApplicationContext;
 
 public class MapsFragment extends Fragment
@@ -87,6 +101,15 @@ public class MapsFragment extends Fragment
 
     public final String REQUESTING_LOCATION_UPDATES_KEY = "REQUESTING_LOCATION_UPDATES_KEY";
     public final String LOCATION_KEY = "LOCATION_KEY";
+
+    // ADDED BY NATHAN GERONIMO
+    public static final int RC_PERMISSIONS = 1000;
+    private final int UPDATE_LOCATION_INTERVAL = 30;
+    private final int CAMERA_REQUST_CODE = 11;
+    private final String APP_TAG = "TrackMe";
+    private File mCurrentPhotoPath;
+    private Bitmap thumbnail;
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -126,8 +149,23 @@ public class MapsFragment extends Fragment
             getActivity().setTitle("Waiting To Start");
         }
 
+        Button camera = rootView.findViewById(R.id.button_camera);
+        camera.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mLastLocation != null) {
+                    openCamera();
+                }
+                else {
+                    Toast.makeText(getActivity(), "Still retrieving GPS signal", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
         return rootView;
     }
+
+
 
     private void useTestData() {
         GPXParser p = new GPXParser();
@@ -463,33 +501,44 @@ public class MapsFragment extends Fragment
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
 
     private void checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+//        if (ContextCompat.checkSelfPermission(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+//                ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED &&
+//                ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ) {
             // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION)) {
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-                new AlertDialog.Builder(getActivity())
-                        .setTitle("Location Permission Needed")
-                        .setMessage("This app needs the Location permission, please accept to use location functionality")
-                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialogInterface, int i) {
-                                //Prompt the user once explanation has been shown
-                                ActivityCompat.requestPermissions(getActivity(),
-                                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-                                        MY_PERMISSIONS_REQUEST_LOCATION);
-                            }
-                        })
-                        .create()
-                        .show();
-            } else {
+//            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION)) {
+//                // Show an explanation to the user *asynchronously* -- don't block
+//                // this thread waiting for the user's response! After the user
+//                // sees the explanation, try again to request the permission.
+//                new AlertDialog.Builder(getActivity())
+//                        .setTitle("Location Permission Needed")
+////                        .setMessage("This app needs the Location permission, please accept to use location functionality")
+//                        .setMessage("This app needs the Location, Camera, and Gallery access permissions, please accept to use location functionality")
+//                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+//                            @Override
+//                            public void onClick(DialogInterface dialogInterface, int i) {
+//                                //Prompt the user once explanation has been shown
+//                                ActivityCompat.requestPermissions(getActivity(),
+//                                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+//                                        MY_PERMISSIONS_REQUEST_LOCATION);
+//                            }
+//                        })
+//                        .create()
+//                        .show();
+//            } else {
                 // No explanation needed, we can request the permission.
+            String[] permissions = { Manifest.permission.CAMERA,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE };
+
+//            ActivityCompat.requestPermissions(getActivity(), permissions, RC_PERMISSIONS);
+//        }
                 ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+//                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                        permissions,
                         MY_PERMISSIONS_REQUEST_LOCATION);
-            }
-        }
+//            }
+//        }
     }
 
     @Override
@@ -516,5 +565,141 @@ public class MapsFragment extends Fragment
         }
     }
 
+
+
+
+
+
+
+
+
+    /** CODE OF NATHAN GERONIMO */
+
+    private void checkPermissions() {
+        String[] permissions = { Manifest.permission.CAMERA,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE };
+
+        ActivityCompat.requestPermissions(getActivity(), permissions, RC_PERMISSIONS);
+    }
+
+    private File createImageFile() throws IOException {
+        // Create an image file title
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String photoName = "JPEG_" + timeStamp + "_";
+        File storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), APP_TAG);
+        if (storageDir.exists()) {
+            Log.d(APP_TAG, "directory exists!");
+        }
+        else {
+            if (storageDir.mkdirs()) {
+                Log.d(APP_TAG, "Directory created!");
+            }
+            else {
+                Log.d(APP_TAG, "Failed to create directory");
+            }
+        }
+
+        File image = File.createTempFile(
+                photoName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        mCurrentPhotoPath = image.getAbsoluteFile();
+        return image;
+    }
+
+    private void openCamera() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Ensure that there's a camera activity to handle the intent
+        if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+                ex.printStackTrace();
+                Toast.makeText(getActivity(), "Couldn't grab photo directory", Toast.LENGTH_SHORT).show();
+            }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                startActivityForResult(takePictureIntent, CAMERA_REQUST_CODE);
+            }
+        }
+    }
+
+    public void insertMarker(LatLng location) {
+
+        // TODO Cluster the markers: https://developers.google.com/maps/documentation/android-api/utility/marker-clustering
+        // TODO Info windows: https://developers.google.com/maps/documentation/android-api/infowindows
+
+        // If the city isn't in the set, put a new marker down.
+        if (thumbnail != null) {
+            mGoogleMap.addMarker(new MarkerOptions()
+                    .position(location)
+                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"))
+                    .setIcon(BitmapDescriptorFactory.fromBitmap(thumbnail));
+//            marked_coordinates.add(location); // Add the newly marked location in the set
+        }
+        else {
+            mGoogleMap.addMarker(new MarkerOptions()
+                    .position(location)
+                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"));
+//            marked_coordinates.add(location); // Add the newly marked location in the set
+        }
+    }
+
+    public void savebitmap(Bitmap bmp, String fileName) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+
+        File f = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), fileName);
+        f.createNewFile();
+        FileOutputStream fo = new FileOutputStream(f);
+        fo.write(bytes.toByteArray());
+        fo.close();
+    }
+
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CAMERA_REQUST_CODE && resultCode == RESULT_OK) {
+
+            // Grab bitmap for photo taken
+            Bundle extras = data.getExtras();
+            Bitmap takenImage = (Bitmap) extras.get("data"); // Grabs the photo taken.
+            String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
+
+            // Make the thumbnail for the map
+            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
+//            addToCluster(mLastLocation);
+            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+
+            // Send the full photo to the general gallery
+            Intent toGallery = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+            File gallery = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), APP_TAG);
+            Uri content = Uri.fromFile(gallery);
+            toGallery.setData(content);
+            getActivity().sendBroadcast(toGallery);
+
+            try {
+                // Send the full photo to the app created photo album
+                savebitmap(takenImage, split[split.length-1]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            File album = new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), split[split.length-1]);
+            Uri content2 = Uri.fromFile(album);
+            toGallery.setData(content2);
+            getActivity().sendBroadcast(toGallery);
+        }
+    }
 
 }
