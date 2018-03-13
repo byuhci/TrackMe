@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.location.Location;
 import android.media.ThumbnailUtils;
@@ -17,6 +18,7 @@ import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -108,7 +110,8 @@ public class MapsFragment extends Fragment
     private final int CAMERA_REQUST_CODE = 11;
     private final String APP_TAG = "TrackMe";
     private File mCurrentPhotoPath;
-    private Bitmap thumbnail;
+    private LocationMarker mLastLocationMarker;
+    private boolean isObserver;
 
 
     @Override
@@ -121,7 +124,7 @@ public class MapsFragment extends Fragment
         FirebaseApp.initializeApp(getActivity());
         mFirebaseDatabase = FirebaseDatabase.getInstance("https://friendlychat-3e92d.firebaseio.com/");
         mMessageDataBaseReference = mFirebaseDatabase.getReference().child("location");
-//
+
         attachDatabaseReadListener();
 
         updateValuesFromBundle(savedInstanceState);
@@ -161,6 +164,12 @@ public class MapsFragment extends Fragment
                 }
             }
         });
+        if (!getActivity().getIntent().getExtras().getBoolean("hiker")) {
+            camera.setVisibility(View.INVISIBLE);
+            isObserver = true;
+        } else {
+            isObserver = false;
+        }
 
         return rootView;
     }
@@ -181,7 +190,9 @@ public class MapsFragment extends Fragment
                 waypoints.get(i).getLongitude();
 
                 //Store in Firebase
-                LocationMarker newLocationMarker = new LocationMarker(waypoints.get(i).getLatitude(), waypoints.get(i).getLongitude(), waypoints.get(i).getTime().toString(), i / 60, 24, waypoints.get(i).getElevation(), 2, 5); //TODO: THIS IS BROKEN! Return time cannot be 5
+                //TODO: THIS IS BROKEN! Return time cannot be 5
+                LocationMarker newLocationMarker = new LocationMarker(waypoints.get(i).getLatitude(), waypoints.get(i).getLongitude(), waypoints.get(i).getTime().toString(), i / 60, 24, waypoints.get(i).getElevation(), 2, 5, null);
+                mLastLocationMarker = newLocationMarker;
                 mMessageDataBaseReference.push().setValue(newLocationMarker);
             }
         } catch (Exception e) {
@@ -263,7 +274,7 @@ public class MapsFragment extends Fragment
             useTestData();
         } else {
             mLocationRequest = new LocationRequest();
-            int numberOfSeconds = 5;
+            int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
             mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
             mLocationRequest.setFastestInterval(1000 * numberOfSeconds);
             mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
@@ -281,8 +292,13 @@ public class MapsFragment extends Fragment
     public void onConnectionFailed(ConnectionResult connectionResult) {
     }
 
+    /**
+     * This function only works for the hiker. It updates the firebase database with his/her current location
+     * @param location
+     */
     @Override
     public void onLocationChanged(Location location) {
+
         System.out.println("onLocationChanged");
         mLastLocation = location;
 
@@ -307,8 +323,10 @@ public class MapsFragment extends Fragment
         }
 
         //Store in Firebase
-        LocationMarker newLocationMarker = new LocationMarker(latLng.latitude, latLng.longitude, formattedDate, location.getTime(), location.getElapsedRealtimeNanos(), location.getAltitude(), location.getSpeed(), returnTime);
+        LocationMarker newLocationMarker = new LocationMarker(latLng.latitude, latLng.longitude, formattedDate, location.getTime(), location.getElapsedRealtimeNanos(), location.getAltitude(), location.getSpeed(), returnTime, null);
         mMessageDataBaseReference.push().setValue(newLocationMarker);
+        mLastLocationMarker = newLocationMarker;
+        // TODO Store picture in firebase like the marker.
     }
 
     private void zoomToLocation(LatLng latLng) {
@@ -378,7 +396,10 @@ public class MapsFragment extends Fragment
         });
     }
 
-
+    /**
+     * This is where the observer receives the location of the hiker.
+     *
+     */
     //Start listening to the database
     private void attachDatabaseReadListener() {
         if (mChildEventListener == null) {
@@ -391,8 +412,17 @@ public class MapsFragment extends Fragment
                     LocationMarker newLocationMarker = dataSnapshot.getValue(LocationMarker.class);
                     mapMarkers.add(newLocationMarker);
 
+                    //TODO How to download photos from firebase if observing
+                    Object stuff = dataSnapshot.getValue();
+
+
                     //Draw the marker
                     drawMarker(newLocationMarker);
+                    //TODO drawPicture(newPicture);
+                    if (newLocationMarker.getThumbnail() != null && isObserver) {
+                        LatLng pictureLatLng = new LatLng(newLocationMarker.getLatitude(), newLocationMarker.getLongitude());
+                        insertMarker(pictureLatLng, stringToBitMap(newLocationMarker.getThumbnail()));
+                    }
 
                     //Update Time Estimate
                     if (getActivity() != null) {
@@ -537,6 +567,7 @@ public class MapsFragment extends Fragment
 //                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
                         permissions,
                         MY_PERMISSIONS_REQUEST_LOCATION);
+
 //            }
 //        }
     }
@@ -574,6 +605,16 @@ public class MapsFragment extends Fragment
 
 
     /** CODE OF NATHAN GERONIMO */
+    public Bitmap stringToBitMap(String encodedString){
+        try {
+            byte [] encodeByte=Base64.decode(encodedString,Base64.DEFAULT);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
+            return ThumbnailUtils.extractThumbnail(bitmap, 150, 150); // Return the thumbnail 
+        } catch(Exception e) {
+            e.getMessage();
+            return null;
+        }
+    }
 
     private void checkPermissions() {
         String[] permissions = { Manifest.permission.CAMERA,
@@ -631,7 +672,7 @@ public class MapsFragment extends Fragment
         }
     }
 
-    public void insertMarker(LatLng location) {
+    public void insertMarker(LatLng location, Bitmap thumbnail) {
 
         // TODO Cluster the markers: https://developers.google.com/maps/documentation/android-api/utility/marker-clustering
         // TODO Info windows: https://developers.google.com/maps/documentation/android-api/infowindows
@@ -676,9 +717,10 @@ public class MapsFragment extends Fragment
             String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
 
             // Make the thumbnail for the map
-            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
+            Bitmap thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
 //            addToCluster(mLastLocation);
-            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), thumbnail);
+
 
             // Send the full photo to the general gallery
             Intent toGallery = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
@@ -699,6 +741,18 @@ public class MapsFragment extends Fragment
             Uri content2 = Uri.fromFile(album);
             toGallery.setData(content2);
             getActivity().sendBroadcast(toGallery);
+
+            //TODO Now upload images to firebase https://stackoverflow.com/questions/13955813/how-to-store-and-view-images-on-firebase
+            ByteArrayOutputStream bYtE = new ByteArrayOutputStream();
+            takenImage.compress(Bitmap.CompressFormat.PNG, 100, bYtE);
+            takenImage.recycle();
+            byte[] byteArray = bYtE.toByteArray();
+            String imageFile = Base64.encodeToString(byteArray, Base64.DEFAULT);
+            mLastLocationMarker.setThumbnail(imageFile); // Set the thumbnail after it's created
+
+            LocationMarker newLocationMarker = mLastLocationMarker;
+            mMessageDataBaseReference.push().setValue(newLocationMarker);
+            mLastLocationMarker.setThumbnail(null); // erase the thumbnail saved so the picture isn't used again
         }
     }
 
