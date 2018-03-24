@@ -17,11 +17,13 @@ import java.util.Map;
 
 public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
 
-    private Map<String, Bitmap> small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
+    private Map<String, Bitmap> small_to_large_photos;
     private Activity galleryActivity;
 
     public GalleryAdapter(Activity galleryActivity) {
         this.galleryActivity = galleryActivity;
+        small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
+
     }
 
     @Override
