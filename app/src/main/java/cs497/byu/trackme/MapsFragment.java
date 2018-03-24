@@ -8,6 +8,7 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
@@ -24,6 +25,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 import android.support.v4.app.Fragment;
 
@@ -38,11 +40,14 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.maps.android.clustering.Cluster;
+import com.google.maps.android.clustering.ClusterManager;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
@@ -51,6 +56,8 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.udacity.friendlychat.R;
+import com.google.maps.android.clustering.view.DefaultClusterRenderer;
+import com.google.maps.android.ui.IconGenerator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -61,6 +68,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Map;
 
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
 import cs497.byu.trackme.com.hs.gpxparser.modal.GPX;
@@ -112,6 +120,10 @@ public class MapsFragment extends Fragment
     private File mCurrentPhotoPath;
     private LocationMarker mLastLocationMarker;
     private boolean isObserver;
+    private ClusterManager<MarkerCluster> mClusterManager;
+    private Map<String, Bitmap> small_to_large_photos; // Key is the item Latlng as a string
+    private Bitmap thumbnail;
+
 
 
     @Override
@@ -151,6 +163,8 @@ public class MapsFragment extends Fragment
         if (!mRequestingLocationUpdates) {
             getActivity().setTitle("Waiting To Start");
         }
+
+        small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
 
         Button camera = rootView.findViewById(R.id.button_camera);
         camera.setOnClickListener(new View.OnClickListener() {
@@ -251,6 +265,31 @@ public class MapsFragment extends Fragment
                 mGoogleMap.setMyLocationEnabled(true);
             }
         }
+
+        // Initialize the cluster manager once the map is ready to god
+        mClusterManager = new ClusterManager<>(getContext(), mGoogleMap);
+        mClusterManager.setRenderer(new MarkerRenderer());
+        mClusterManager.setOnClusterClickListener(new ClusterManager.OnClusterClickListener<MarkerCluster>() {
+            @Override
+            public boolean onClusterClick(Cluster<MarkerCluster> cluster) {
+                Toast.makeText(getActivity(),cluster.getSize() + " in this cluster!", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(getActivity(), GalleryActivity.class);
+                startActivity(intent);
+                return false;
+            }
+        });
+
+        mClusterManager.setOnClusterItemClickListener(new ClusterManager.OnClusterItemClickListener<MarkerCluster>() {
+            @Override
+            public boolean onClusterItemClick(MarkerCluster markerCluster) {
+                Toast.makeText(getActivity(), "Item Clicked!", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        });
+        mClusterManager.setAnimation(true);
+
+        mGoogleMap.setOnCameraIdleListener(mClusterManager); // Waits for cluster manager to be updated
+        mGoogleMap.setOnMarkerClickListener(mClusterManager); // The onclick methods are in the cluster manager
     }
 
     protected synchronized void buildGoogleApiClient() {
@@ -412,16 +451,13 @@ public class MapsFragment extends Fragment
                     LocationMarker newLocationMarker = dataSnapshot.getValue(LocationMarker.class);
                     mapMarkers.add(newLocationMarker);
 
-                    //TODO How to download photos from firebase if observing
-                    Object stuff = dataSnapshot.getValue();
-
 
                     //Draw the marker
                     drawMarker(newLocationMarker);
-                    //TODO drawPicture(newPicture);
                     if (newLocationMarker.getThumbnail() != null && isObserver) {
                         LatLng pictureLatLng = new LatLng(newLocationMarker.getLatitude(), newLocationMarker.getLongitude());
-                        insertMarker(pictureLatLng, stringToBitMap(newLocationMarker.getThumbnail()));
+//                        insertMarker(pictureLatLng, stringToBitMap(newLocationMarker.getThumbnail()));
+                        addToCluster(pictureLatLng, stringToBitMap(newLocationMarker.getThumbnail()));
                     }
 
                     //Update Time Estimate
@@ -609,21 +645,13 @@ public class MapsFragment extends Fragment
         try {
             byte [] encodeByte=Base64.decode(encodedString,Base64.DEFAULT);
             Bitmap bitmap = BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
-            return ThumbnailUtils.extractThumbnail(bitmap, 150, 150); // Return the thumbnail 
+            return ThumbnailUtils.extractThumbnail(bitmap, 150, 150); // Return the thumbnail
         } catch(Exception e) {
             e.getMessage();
             return null;
         }
     }
 
-    private void checkPermissions() {
-        String[] permissions = { Manifest.permission.CAMERA,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE };
-
-        ActivityCompat.requestPermissions(getActivity(), permissions, RC_PERMISSIONS);
-    }
 
     private File createImageFile() throws IOException {
         // Create an image file title
@@ -672,25 +700,36 @@ public class MapsFragment extends Fragment
         }
     }
 
-    public void insertMarker(LatLng location, Bitmap thumbnail) {
+//    public void insertMarker(LatLng location, Bitmap thumbnail) {
+//
+//        // TODO Cluster the markers: https://developers.google.com/maps/documentation/android-api/utility/marker-clustering
+//        // TODO Info windows: https://developers.google.com/maps/documentation/android-api/infowindows
+//
+//        // If the city isn't in the set, put a new marker down.
+//        if (thumbnail != null) {
+//            mGoogleMap.addMarker(new MarkerOptions()
+//                    .position(location)
+//                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"))
+//                    .setIcon(BitmapDescriptorFactory.fromBitmap(thumbnail));
+////            marked_coordinates.add(location); // Add the newly marked location in the set
+//        }
+//        else {
+//            mGoogleMap.addMarker(new MarkerOptions()
+//                    .position(location)
+//                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"));
+////            marked_coordinates.add(location); // Add the newly marked location in the set
+//        }
+//    }
 
-        // TODO Cluster the markers: https://developers.google.com/maps/documentation/android-api/utility/marker-clustering
-        // TODO Info windows: https://developers.google.com/maps/documentation/android-api/infowindows
-
-        // If the city isn't in the set, put a new marker down.
-        if (thumbnail != null) {
-            mGoogleMap.addMarker(new MarkerOptions()
-                    .position(location)
-                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"))
-                    .setIcon(BitmapDescriptorFactory.fromBitmap(thumbnail));
-//            marked_coordinates.add(location); // Add the newly marked location in the set
-        }
-        else {
-            mGoogleMap.addMarker(new MarkerOptions()
-                    .position(location)
-                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"));
-//            marked_coordinates.add(location); // Add the newly marked location in the set
-        }
+    private void addToCluster(LatLng location, Bitmap takenImage) {
+        String title = String.valueOf(location.latitude) + " " + String.valueOf(location.longitude);
+        String snippet = "snip";
+        Bitmap newThumbnail = ThumbnailUtils.extractThumbnail(takenImage, 150, 150);
+        MarkerCluster item = new MarkerCluster(location.latitude, location.longitude, title, snippet, newThumbnail);
+        mClusterManager.addItem(item);
+        mClusterManager.cluster(); // Make the markers/clusters appear immediately
+        Toast.makeText(getActivity(), "Marker placed", Toast.LENGTH_SHORT).show();
+        small_to_large_photos.put(item.getPosition().toString(), takenImage); // Add to map
     }
 
     public void savebitmap(Bitmap bmp, String fileName) throws IOException {
@@ -717,9 +756,9 @@ public class MapsFragment extends Fragment
             String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
 
             // Make the thumbnail for the map
-            Bitmap thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
-//            addToCluster(mLastLocation);
-            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), thumbnail);
+            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
+            addToCluster(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
+//            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
 
 
             // Send the full photo to the general gallery
@@ -729,20 +768,20 @@ public class MapsFragment extends Fragment
             toGallery.setData(content);
             getActivity().sendBroadcast(toGallery);
 
-            try {
-                // Send the full photo to the app created photo album
-                savebitmap(takenImage, split[split.length-1]);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                // Send the full photo to the app created photo album
+//                savebitmap(takenImage, split[split.length-1]);
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
 
-            File album = new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), split[split.length-1]);
-            Uri content2 = Uri.fromFile(album);
-            toGallery.setData(content2);
-            getActivity().sendBroadcast(toGallery);
+//            Intent toGallery2 = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+//            File album = new File(Environment.getExternalStoragePublicDirectory(
+//                    Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), split[split.length-1]);
+//            Uri content2 = Uri.fromFile(album);
+//            toGallery2.setData(content2);
+//            getActivity().sendBroadcast(toGallery2);
 
-            //TODO Now upload images to firebase https://stackoverflow.com/questions/13955813/how-to-store-and-view-images-on-firebase
             ByteArrayOutputStream bYtE = new ByteArrayOutputStream();
             takenImage.compress(Bitmap.CompressFormat.PNG, 100, bYtE);
             takenImage.recycle();
@@ -756,4 +795,69 @@ public class MapsFragment extends Fragment
         }
     }
 
+    /**
+     * Draws profile photos inside markers (using IconGenerator).
+     * When there are multiple people in the cluster, draw multiple photos (using MultiDrawable).
+     */
+    private class MarkerRenderer extends DefaultClusterRenderer<MarkerCluster> {
+        private final IconGenerator mIconGenerator = new IconGenerator(getApplicationContext());
+        private final IconGenerator mClusterIconGenerator = new IconGenerator(getApplicationContext());
+        private final ImageView mImageView;
+        private final ImageView mClusterImageView;
+        private final int mDimension;
+
+        public MarkerRenderer() {
+            super(getApplicationContext(), mGoogleMap, mClusterManager);
+
+
+            View multiProfile = getLayoutInflater().inflate(R.layout.multi_profile, null);
+            mClusterIconGenerator.setContentView(multiProfile);
+            mClusterImageView = (ImageView) multiProfile.findViewById(R.id.image);
+
+            mImageView = new ImageView(getApplicationContext());
+            mDimension = (int) getResources().getDimension(R.dimen.custom_profile_image);
+            mImageView.setLayoutParams(new ViewGroup.LayoutParams(mDimension, mDimension));
+            int padding = (int) getResources().getDimension(R.dimen.custom_profile_padding);
+            mImageView.setPadding(padding, padding, padding, padding);
+            mIconGenerator.setContentView(mImageView);
+        }
+
+        @Override
+        protected void onBeforeClusterItemRendered(MarkerCluster item, MarkerOptions markerOptions) {
+            // Draw a marker with the newly created thumbnail.
+            if (isObserver) {
+                mClusterImageView.setImageDrawable(new BitmapDrawable(item.getThumbnail()));
+                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(item.getThumbnail()));
+            }
+            else {
+                mClusterImageView.setImageDrawable(new BitmapDrawable(thumbnail));
+                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(thumbnail));
+            }
+
+        }
+
+        @Override
+        protected void onBeforeClusterRendered(Cluster<MarkerCluster> cluster, MarkerOptions markerOptions) {
+            // Places the number of markers inside of a cluster,
+            // And puts the most recently added marker icon on top
+            if (isObserver) {
+                Bitmap newThumbnail = small_to_large_photos.get(cluster.getPosition().toString());
+                mClusterImageView.setImageDrawable(new BitmapDrawable(newThumbnail));
+                Bitmap icon = mClusterIconGenerator.makeIcon(String.valueOf(cluster.getSize()));
+                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));
+            }
+            else {
+                mClusterImageView.setImageDrawable(new BitmapDrawable(thumbnail));
+                Bitmap icon = mClusterIconGenerator.makeIcon(String.valueOf(cluster.getSize()));
+                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));
+            }
+
+        }
+
+        @Override
+        protected boolean shouldRenderAsCluster(Cluster cluster) {
+            // Always render clusters.
+            return cluster.getSize() > 0;
+        }
+    }
 }
