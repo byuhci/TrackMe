@@ -3,6 +3,7 @@ package cs497.byu.trackme;
 import android.graphics.Bitmap;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 /**
@@ -17,7 +18,7 @@ public class Model {
     public static Model SINGLETON = new Model();
 
     // Data members
-    private Map<String, Bitmap> small_to_large_photos;
+    private Map<String, HashSet<Bitmap>> small_to_large_photos;
 
 
     // Constructor
@@ -25,13 +26,25 @@ public class Model {
         small_to_large_photos = new HashMap<>();
     }
 
-    // Getters and Setters
+    // Methods
+    public int getTotalPicCount() {
+        int count = 0;
 
-    public Map<String, Bitmap> getSmall_to_large_photos() {
+        for (Map.Entry<String, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
+            for (Bitmap image : map.getValue()) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    // Getters and Setters
+    public Map<String, HashSet<Bitmap>> getSmall_to_large_photos() {
         return small_to_large_photos;
     }
 
-    public void setSmall_to_large_photos(Map<String, Bitmap> small_to_large_photos) {
+    public void setSmall_to_large_photos(Map<String, HashSet<Bitmap>> small_to_large_photos) {
         this.small_to_large_photos = small_to_large_photos;
     }
 }

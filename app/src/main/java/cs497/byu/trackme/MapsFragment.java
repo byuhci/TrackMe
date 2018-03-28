@@ -61,6 +61,7 @@ import com.google.maps.android.ui.IconGenerator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,6 +69,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Map;
 
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
@@ -121,8 +123,9 @@ public class MapsFragment extends Fragment
     private LocationMarker mLastLocationMarker;
     private boolean isObserver;
     private ClusterManager<MarkerCluster> mClusterManager;
-    private Map<String, Bitmap> small_to_large_photos; // Key is the item Latlng as a string
+    private Map<String, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
     private Bitmap thumbnail;
+    private String mLastPhotoTimeStamp;
 
 
 
@@ -655,11 +658,12 @@ public class MapsFragment extends Fragment
     }
 
 
-    private File createImageFile() throws IOException {
+    private File createImageFile(File storage) throws IOException {
         // Create an image file title
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String photoName = "JPEG_" + timeStamp + "_";
-        File storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), APP_TAG);
+        mLastPhotoTimeStamp = timeStamp + ".jpg";
+        String photoName = timeStamp + "_";
+        File storageDir = new File(storage, APP_TAG);
         if (storageDir.exists()) {
             Log.d(APP_TAG, "directory exists!");
         }
@@ -673,8 +677,8 @@ public class MapsFragment extends Fragment
         }
 
         File image = File.createTempFile(
-                photoName,  /* prefix */
-                ".jpg",         /* suffix */
+                photoName,      /* prefix */
+                ".jpg",   /* suffix */
                 storageDir      /* directory */
         );
 
@@ -689,7 +693,7 @@ public class MapsFragment extends Fragment
             // Create the File where the photo should go
             File photoFile = null;
             try {
-                photoFile = createImageFile();
+                photoFile = createImageFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES));
             } catch (IOException ex) {
                 // Error occurred while creating the File
                 ex.printStackTrace();
@@ -702,6 +706,16 @@ public class MapsFragment extends Fragment
         }
     }
 
+    private void insertPictureToMap(String key, Bitmap image) {
+        if (small_to_large_photos.containsKey(key)) { // If there's a key, then there's a set
+            small_to_large_photos.get(key).add(image); // So just add the image to that set
+        }
+        else {
+            HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
+            newSet.add(image);
+            small_to_large_photos.put(key, newSet);
+        }
+    }
 
     private void addToCluster(LatLng location, Bitmap takenImage) {
         String title = String.valueOf(location.latitude) + " " + String.valueOf(location.longitude);
@@ -711,12 +725,14 @@ public class MapsFragment extends Fragment
         mClusterManager.addItem(item);
         mClusterManager.cluster(); // Make the markers/clusters appear immediately
         Toast.makeText(getActivity(), "Marker placed", Toast.LENGTH_SHORT).show();
-        small_to_large_photos.put(item.getPosition().toString(), takenImage); // Add to map
+
+        insertPictureToMap(item.getPosition().toString(), takenImage);
     }
 
     public void savebitmap(Bitmap bmp, String fileName) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+//        bmp.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
 
         File f = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), fileName);
@@ -735,20 +751,7 @@ public class MapsFragment extends Fragment
             // Grab bitmap for photo taken
             Bundle extras = data.getExtras();
             Bitmap takenImage = (Bitmap) extras.get("data"); // Grabs the photo taken.
-            String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
-
-            // Make the thumbnail for the map
-            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
-            addToCluster(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
-//            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
-
-
-            // Send the full photo to the general gallery
-            Intent toGallery = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-            File gallery = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), APP_TAG);
-            Uri content = Uri.fromFile(gallery);
-            toGallery.setData(content);
-            getActivity().sendBroadcast(toGallery);
+//            String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
 
 //            try {
 //                // Send the full photo to the app created photo album
@@ -757,12 +760,21 @@ public class MapsFragment extends Fragment
 //                e.printStackTrace();
 //            }
 
-//            Intent toGallery2 = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+//            Intent toGallery = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
 //            File album = new File(Environment.getExternalStoragePublicDirectory(
 //                    Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), split[split.length-1]);
-//            Uri content2 = Uri.fromFile(album);
-//            toGallery2.setData(content2);
-//            getActivity().sendBroadcast(toGallery2);
+//            Uri content = Uri.fromFile(album);
+//            toGallery.setData(content);
+//            getActivity().sendBroadcast(toGallery);
+
+
+            // Make the thumbnail for the map
+            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
+            String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + File.separator + mLastPhotoTimeStamp;
+            Bitmap fullPhoto = BitmapFactory.decodeFile(filePath);
+            addToCluster(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
+//            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
+
 
             ByteArrayOutputStream bYtE = new ByteArrayOutputStream();
             takenImage.compress(Bitmap.CompressFormat.PNG, 100, bYtE);
@@ -822,7 +834,7 @@ public class MapsFragment extends Fragment
             // Places the number of markers inside of a cluster,
             // And puts the most recently added marker icon on top
             if (isObserver) {
-                Bitmap newThumbnail = small_to_large_photos.get(cluster.getPosition().toString());
+                Bitmap newThumbnail = small_to_large_photos.get(cluster.getPosition().toString()).iterator().next();
                 mClusterImageView.setImageDrawable(new BitmapDrawable(newThumbnail));
                 Bitmap icon = mClusterIconGenerator.makeIcon(String.valueOf(cluster.getSize()));
                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));

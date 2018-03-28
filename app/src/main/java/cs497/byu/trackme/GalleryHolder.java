@@ -24,15 +24,16 @@ public class GalleryHolder extends RecyclerView.ViewHolder {
 
         this.galleryActivity = galleryActivity;
 
-
-        imageView = (ImageView) view.findViewById(R.id.photo);
-        imageView.setClickable(true);
+        this.imageView = view.findViewById(R.id.photo);
+        this.imageView.setClickable(true);
         imageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(galleryActivity, "Image clicked", Toast.LENGTH_SHORT).show();
+                Toast.makeText(galleryActivity, "Image " + getAdapterPosition() + " clicked", Toast.LENGTH_SHORT).show();
             }
         });
+
+
     }
 
     public ImageView getImageView() {
