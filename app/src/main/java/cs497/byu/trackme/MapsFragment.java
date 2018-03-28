@@ -274,6 +274,8 @@ public class MapsFragment extends Fragment
             public boolean onClusterClick(Cluster<MarkerCluster> cluster) {
                 Toast.makeText(getActivity(),cluster.getSize() + " in this cluster!", Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(getActivity(), GalleryActivity.class);
+                intent.setFlags(intent.getFlags() | Intent.FLAG_ACTIVITY_NO_HISTORY); // Prevents the gallery activity from being added to the backstack
+
                 startActivity(intent);
                 return false;
             }
@@ -309,9 +311,9 @@ public class MapsFragment extends Fragment
     }
 
     protected void startLocationUpdates() {
-        if (TESTMODE) {
-            useTestData();
-        } else {
+//        if (TESTMODE) {
+//            useTestData();
+//        } else {
             mLocationRequest = new LocationRequest();
             int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
             mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
@@ -320,7 +322,7 @@ public class MapsFragment extends Fragment
             if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
             }
-        }
+//        }
     }
 
     @Override
@@ -700,26 +702,6 @@ public class MapsFragment extends Fragment
         }
     }
 
-//    public void insertMarker(LatLng location, Bitmap thumbnail) {
-//
-//        // TODO Cluster the markers: https://developers.google.com/maps/documentation/android-api/utility/marker-clustering
-//        // TODO Info windows: https://developers.google.com/maps/documentation/android-api/infowindows
-//
-//        // If the city isn't in the set, put a new marker down.
-//        if (thumbnail != null) {
-//            mGoogleMap.addMarker(new MarkerOptions()
-//                    .position(location)
-//                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"))
-//                    .setIcon(BitmapDescriptorFactory.fromBitmap(thumbnail));
-////            marked_coordinates.add(location); // Add the newly marked location in the set
-//        }
-//        else {
-//            mGoogleMap.addMarker(new MarkerOptions()
-//                    .position(location)
-//                    .title(String.valueOf(location.latitude) + " " + String.valueOf(location.longitude) + " marker"));
-////            marked_coordinates.add(location); // Add the newly marked location in the set
-//        }
-//    }
 
     private void addToCluster(LatLng location, Bitmap takenImage) {
         String title = String.valueOf(location.latitude) + " " + String.valueOf(location.longitude);
@@ -784,7 +766,6 @@ public class MapsFragment extends Fragment
 
             ByteArrayOutputStream bYtE = new ByteArrayOutputStream();
             takenImage.compress(Bitmap.CompressFormat.PNG, 100, bYtE);
-            takenImage.recycle();
             byte[] byteArray = bYtE.toByteArray();
             String imageFile = Base64.encodeToString(byteArray, Base64.DEFAULT);
             mLastLocationMarker.setThumbnail(imageFile); // Set the thumbnail after it's created
