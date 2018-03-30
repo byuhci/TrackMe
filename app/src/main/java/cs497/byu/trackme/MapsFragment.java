@@ -70,6 +70,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
@@ -126,7 +127,7 @@ public class MapsFragment extends Fragment
     private Map<String, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
     private Bitmap thumbnail;
     private String mLastPhotoTimeStamp;
-
+    private List<Bitmap> allPictures; // Contains all the pitures ever saved
 
 
     @Override
@@ -168,6 +169,8 @@ public class MapsFragment extends Fragment
         }
 
         small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
+        allPictures = Model.SINGLETON.getAllPictures();
+//        mLastLocation = Model.SINGLETON.getLastLocationSaved();
 
         Button camera = rootView.findViewById(R.id.button_camera);
         camera.setOnClickListener(new View.OnClickListener() {
@@ -276,6 +279,7 @@ public class MapsFragment extends Fragment
             @Override
             public boolean onClusterClick(Cluster<MarkerCluster> cluster) {
                 Toast.makeText(getActivity(),cluster.getSize() + " in this cluster!", Toast.LENGTH_SHORT).show();
+                Model.SINGLETON.setLastLocationSaved(cluster.getPosition());
                 Intent intent = new Intent(getActivity(), GalleryActivity.class);
                 intent.setFlags(intent.getFlags() | Intent.FLAG_ACTIVITY_NO_HISTORY); // Prevents the gallery activity from being added to the backstack
 
@@ -727,6 +731,7 @@ public class MapsFragment extends Fragment
         Toast.makeText(getActivity(), "Marker placed", Toast.LENGTH_SHORT).show();
 
         insertPictureToMap(item.getPosition().toString(), takenImage);
+        allPictures.add(takenImage);
     }
 
     public void savebitmap(Bitmap bmp, String fileName) throws IOException {

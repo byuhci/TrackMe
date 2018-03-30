@@ -8,10 +8,13 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.google.android.gms.maps.model.LatLng;
 import com.google.firebase.udacity.friendlychat.R;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,11 +25,26 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
 
     private Map<String, HashSet<Bitmap>> small_to_large_photos;
     private Activity galleryActivity;
-//    private Iterator
+    private List<Bitmap> allPictures; // All the pictures in the app will be saved to this list
+    private LatLng keyPosition;
 
-    public GalleryAdapter(Activity galleryActivity) {
+    public GalleryAdapter(Activity galleryActivity, LatLng keyPosition) {
         this.galleryActivity = galleryActivity;
         small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
+        allPictures = getAllPictures();
+        this.keyPosition = keyPosition;
+    }
+
+    private List<Bitmap> getAllPictures() {
+        List<Bitmap> list = new ArrayList<>();
+
+        for (Map.Entry<String, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
+            for (Bitmap image : map.getValue()) {
+                list.add(image);
+            }
+        }
+
+        return list;
     }
 
     @Override
@@ -42,14 +60,19 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
     public void onBindViewHolder(GalleryHolder holder, int position) {
 
         for (Map.Entry<String, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
+            if (keyPosition.toString().equals(map.getKey())) {
+                for (Bitmap image : map.getValue()) {
 
-            Log.e("KEY", map.getKey());
-            for (Bitmap image : map.getValue()) {
-                Log.e("SET", map.getValue().toString());
-                Log.e("VALUE", image.toString());
+                    // This ensures that every image will be listed in the recycler view.
+                    // If the image in the map, at the cooresponding Latlng, matches
+                    if (allPictures.get(position) == image) {
+                        holder.setImageView(image);
 
-                holder.setImageView(image);
+                    }
+                }
             }
+
+
         }
 
     }
@@ -57,6 +80,6 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
 
     @Override
     public int getItemCount() {
-         return Model.SINGLETON.getTotalPicCount();
+         return Model.SINGLETON.getTotalPicCount(keyPosition.toString());
     }
 }

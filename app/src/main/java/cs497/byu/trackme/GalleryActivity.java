@@ -17,9 +17,10 @@ public class GalleryActivity extends AppCompatActivity {
         setContentView(R.layout.activity_gallery);
 
 
+
         RecyclerView gallery = (RecyclerView) findViewById(R.id.photos_view);
         gallery.setLayoutManager(new LinearLayoutManager(this));
-        gallery.setAdapter(new GalleryAdapter(this));
+        gallery.setAdapter(new GalleryAdapter(this, Model.SINGLETON.getLastLocationSaved()));
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
