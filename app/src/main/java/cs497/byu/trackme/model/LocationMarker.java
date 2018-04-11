@@ -1,5 +1,6 @@
 package cs497.byu.trackme.model;
 
+import android.graphics.Bitmap;
 import android.location.Location;
 import android.location.LocationManager;
 
@@ -19,19 +20,21 @@ public class LocationMarker {
     //Location location;
     //Calendar calendar;
 
-    double latitude;
-    double longitude;
-    String formattedTime;
-    long readableTime;
-    long exactTime;
-    double speed;
-    double elevation;
-    double returnTime;
+    private double latitude;
+    private double longitude;
+    private String formattedTime;
+    private long readableTime;
+    private long exactTime;
+    private double speed;
+    private double elevation;
+    private double returnTime;
+    private String thumbnail;
 
     public LocationMarker() {
     }
 
-    public LocationMarker(double latitude, double longitude, String formattedTime, long readableTime, long exactTime, double elevation, double speed, double returnTime) {
+    public LocationMarker(double latitude, double longitude, String formattedTime, long readableTime,
+                          long exactTime, double elevation, double speed, double returnTime, String thumbnail) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.formattedTime = formattedTime;
@@ -40,6 +43,7 @@ public class LocationMarker {
         this.readableTime = readableTime;
         this.speed = speed;
         this.returnTime = returnTime;
+        this.thumbnail = thumbnail;
     }
 
     //----Getters and Setters---//
@@ -112,6 +116,13 @@ public class LocationMarker {
         this.returnTime = timeToStart;
     }
 
+    public String getThumbnail() {
+        return thumbnail;
+    }
+
+    public void setThumbnail(String thumbnail) {
+        this.thumbnail = thumbnail;
+    }
 
     /*
     public LocationMarker(Location location, Calendar calendar) {

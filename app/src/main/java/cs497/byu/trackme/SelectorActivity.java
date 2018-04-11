@@ -32,6 +32,9 @@ public class SelectorActivity extends AppCompatActivity {
             public void onClick(View v) {
                 ProfileData.getInstance().setUserType(ProfileData.USER.HIKER);
                 Intent mainActivityIntent = new Intent(getApplicationContext(), MainActivity.class);
+
+                //ADDED CODE BY NATHAN GERONIMO
+                mainActivityIntent.putExtra("hiker", true); // Determines if camera button should appear or not
                 startActivity(mainActivityIntent);
             }
         });
@@ -41,6 +44,9 @@ public class SelectorActivity extends AppCompatActivity {
             public void onClick(View v) {
                 ProfileData.getInstance().setUserType(ProfileData.USER.OBSERVER);
                 Intent mainActivityIntent = new Intent(getApplicationContext(), MainActivity.class);
+
+                // ADDED CODE BY NATHAN GERONIMO
+                mainActivityIntent.putExtra("hiker", false); // Determines if camera button should appear or not
                 startActivity(mainActivityIntent);
             }
         });
