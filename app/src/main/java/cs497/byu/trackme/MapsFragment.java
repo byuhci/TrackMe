@@ -31,6 +31,12 @@ import android.widget.ImageView;
 import android.widget.Toast;
 import android.support.v4.app.Fragment;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 
@@ -48,6 +54,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.gson.Gson;
 import com.google.maps.android.clustering.Cluster;
 import com.google.maps.android.clustering.ClusterManager;
 import com.google.firebase.FirebaseApp;
@@ -79,6 +86,8 @@ import java.util.Map;
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
 import cs497.byu.trackme.com.hs.gpxparser.modal.GPX;
 import cs497.byu.trackme.com.hs.gpxparser.modal.Waypoint;
+import cs497.byu.trackme.hikingAPI.GetTrailsResponseList;
+import cs497.byu.trackme.hikingAPI.Trail;
 import cs497.byu.trackme.model.LocationMarker;
 import cs497.byu.trackme.model.ProfileData;
 
@@ -132,6 +141,11 @@ public class MapsFragment extends Fragment
     private String mLastPhotoTimeStamp;
     private List<Bitmap> allPictures; // Contains all the pitures ever saved
 
+    //Hiking API
+    static final String HIKING_PROJECT_KEY = "200230210-03d0722caf5c7e27136640b7f114f736";
+    double lat;
+    double lon;
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -153,7 +167,8 @@ public class MapsFragment extends Fragment
         if (ProfileData.getInstance().getUserType().equals(ProfileData.USER.HIKER)) {
             mStartButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    startRecordingHike();
+                    getHike();
+//                    startRecordingHike();
                     mFinishButton.setVisibility(View.VISIBLE);
                 }
             });
@@ -221,6 +236,50 @@ public class MapsFragment extends Fragment
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void getHike() {
+        /**
+         * TODO: send request to hiking api
+         */
+
+        RequestQueue queue = Volley.newRequestQueue(this.getContext());
+
+        if (mLastLocation != null) {
+            lat = mLastLocation.getLatitude();
+            lon = mLastLocation.getLongitude();
+        }
+        int maxDist = 1;
+
+        String requestURL = "https://www.hikingproject.com/data/get-trails?lat=" + lat + "&lon=" + lon + "&maxDistance=" + maxDist + "&key=" + HIKING_PROJECT_KEY;
+
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, requestURL, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                findClosestHike(response);
+                startRecordingHike();
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+                startRecordingHike();
+            }
+        });
+
+        queue.add(stringRequest);
+    }
+
+    private void findClosestHike(String json){
+        List<Trail> trails = parseHikes(json);
+//        Arrays.sort(trails.toArray(), );
+        int foo = 0;
+    }
+
+    private List<Trail> parseHikes(String hikingApiJson) {
+        Gson gson = new Gson();
+
+        return gson.fromJson(hikingApiJson, GetTrailsResponseList.class).fixCoords(lat, lon).getTrails();
     }
 
     private void startRecordingHike() {
@@ -461,6 +520,10 @@ public class MapsFragment extends Fragment
                     //dataSnapshot is a "snapshot" instance of the database, and in this case, will be the new added message.
                     LocationMarker newLocationMarker = dataSnapshot.getValue(LocationMarker.class);
                     mapMarkers.add(newLocationMarker);
+
+                    // update current position
+                    lat = newLocationMarker.getLatitude();
+                    lon = newLocationMarker.getLongitude();
 
 
                     //Draw the marker
