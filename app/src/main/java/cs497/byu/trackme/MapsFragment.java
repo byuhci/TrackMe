@@ -1,6 +1,7 @@
 package cs497.byu.trackme;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -20,6 +21,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.util.Base64;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -65,6 +67,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -124,7 +127,7 @@ public class MapsFragment extends Fragment
     private LocationMarker mLastLocationMarker;
     private boolean isObserver;
     private ClusterManager<MarkerCluster> mClusterManager;
-    private Map<String, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
+    private Map<LatLng, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
     private Bitmap thumbnail;
     private String mLastPhotoTimeStamp;
     private List<Bitmap> allPictures; // Contains all the pitures ever saved
@@ -374,7 +377,6 @@ public class MapsFragment extends Fragment
         LocationMarker newLocationMarker = new LocationMarker(latLng.latitude, latLng.longitude, formattedDate, location.getTime(), location.getElapsedRealtimeNanos(), location.getAltitude(), location.getSpeed(), returnTime, null);
         mMessageDataBaseReference.push().setValue(newLocationMarker);
         mLastLocationMarker = newLocationMarker;
-        // TODO Store picture in firebase like the marker.
     }
 
     private void zoomToLocation(LatLng latLng) {
@@ -710,16 +712,43 @@ public class MapsFragment extends Fragment
         }
     }
 
-    private void insertPictureToMap(String key, Bitmap image) {
-        if (small_to_large_photos.containsKey(key)) { // If there's a key, then there's a set
-            small_to_large_photos.get(key).add(image); // So just add the image to that set
-        }
-        else {
+    private void insertPictureToMap(LatLng currLoc, Bitmap image) {
+
+
+
+        if (small_to_large_photos.isEmpty()) { // If the map has no markers
             HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
             newSet.add(image);
-            small_to_large_photos.put(key, newSet);
+            small_to_large_photos.put(currLoc, newSet);
         }
+        else {
+            double result = 0;
+            for (LatLng locationKey : small_to_large_photos.keySet()) {
+//                float[] result = new float[1];
+//                Location.distanceBetween(locationKey.latitude, locationKey.longitude, currLoc.latitude, currLoc.longitude, result);
+                result = distanceBetween(locationKey.latitude, locationKey.longitude, currLoc.latitude, currLoc.longitude);
+                if (result <= 2) { // if distance between first and second location is less than 2m
+                    small_to_large_photos.get(locationKey).add(image); // just add the image to the existing set
+                }
+                else {
+                    HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
+                    newSet.add(image);
+                    small_to_large_photos.put(currLoc, newSet);
+                }
+            }
+        }
+
+//        if (small_to_large_photos.containsKey(stringKey)) { // If there's a key, then there's a set
+//            small_to_large_photos.get(stringKey).add(image); // So just add the image to that set
+//        }
+//        else {
+//            HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
+//            newSet.add(image);
+//            small_to_large_photos.put(stringKey, newSet);
+//        }
+
     }
+
 
     private void addToCluster(LatLng location, Bitmap takenImage) {
         String title = String.valueOf(location.latitude) + " " + String.valueOf(location.longitude);
@@ -730,7 +759,8 @@ public class MapsFragment extends Fragment
         mClusterManager.cluster(); // Make the markers/clusters appear immediately
         Toast.makeText(getActivity(), "Marker placed", Toast.LENGTH_SHORT).show();
 
-        insertPictureToMap(item.getPosition().toString(), takenImage);
+        Log.e("LOCATION OF PIC TAKEN", location.toString());
+        insertPictureToMap(item.getPosition(), takenImage);
         allPictures.add(takenImage);
     }
 
@@ -747,6 +777,48 @@ public class MapsFragment extends Fragment
         fo.close();
     }
 
+    public static Bitmap getScaledBitmapFromUri(Context context, Uri uriImageFile) {
+        Bitmap scaledBitmap = null;
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        options.inSampleSize = 4;
+        try {
+            BitmapFactory.decodeStream(context.getContentResolver()
+                    .openInputStream(uriImageFile), null, options);
+        } catch (FileNotFoundException e1) {
+            e1.printStackTrace();
+            return null;
+        }
+
+//        int srcWidth = options.outWidth;
+//        int scale = 1;
+//        while (srcWidth / 2 > 60) {
+//            srcWidth /= 2;
+//            scale *= 2;
+//        }
+
+        int srcHeight = options.outHeight;
+        int scale = 1;
+        while (srcHeight / 2 > 60) {
+            srcHeight /= 2;
+            scale *= 2;
+        }
+
+        options.inJustDecodeBounds = false;
+        options.inDither = false;
+        options.inSampleSize = scale;
+
+        try {
+            scaledBitmap = BitmapFactory.decodeStream(context
+                    .getContentResolver().openInputStream(uriImageFile), null, options);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        return scaledBitmap;
+    }
+
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -756,6 +828,16 @@ public class MapsFragment extends Fragment
             // Grab bitmap for photo taken
             Bundle extras = data.getExtras();
             Bitmap takenImage = (Bitmap) extras.get("data"); // Grabs the photo taken.
+            Bitmap rescaledImage = takenImage;
+            Uri targetUri = data.getData();
+            if(targetUri != null) {
+                DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
+                rescaledImage = getScaledBitmapFromUri(getContext(), targetUri);
+//                imageView.setImageBitmap(photo);
+            } else {
+                Log.e("Rescaled", "DIDN'T WORK ");
+            }
+
 //            String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
 
 //            try {
@@ -776,7 +858,6 @@ public class MapsFragment extends Fragment
             // Make the thumbnail for the map
             thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
             String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + File.separator + mLastPhotoTimeStamp;
-            Bitmap fullPhoto = BitmapFactory.decodeFile(filePath);
             addToCluster(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
 //            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
 

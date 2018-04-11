@@ -23,7 +23,7 @@ public class Model {
     public static Model SINGLETON = new Model();
 
     // Data members
-    private Map<String, HashSet<Bitmap>> small_to_large_photos;
+    private Map<LatLng, HashSet<Bitmap>> small_to_large_photos;
     private List<Bitmap> allPictures; // All the pictures in the app will be saved to this list
     private LatLng lastLocationSaved;
 
@@ -36,11 +36,11 @@ public class Model {
     }
 
     // Methods
-    public int getTotalPicCount(String key) {
+    public int getTotalPicCount(LatLng key) {
         int count = 0;
 
-        for (Map.Entry<String, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
-            if (key.equals(map.getKey())){
+        for (Map.Entry<LatLng, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
+            if (key == map.getKey()) {
                 for (Bitmap image : map.getValue()) {
                     count++;
                 }
@@ -51,11 +51,11 @@ public class Model {
     }
 
     // Getters and Setters
-    public Map<String, HashSet<Bitmap>> getSmall_to_large_photos() {
+    public Map<LatLng, HashSet<Bitmap>> getSmall_to_large_photos() {
         return small_to_large_photos;
     }
 
-    public void setSmall_to_large_photos(Map<String, HashSet<Bitmap>> small_to_large_photos) {
+    public void setSmall_to_large_photos(Map<LatLng, HashSet<Bitmap>> small_to_large_photos) {
         this.small_to_large_photos = small_to_large_photos;
     }
 

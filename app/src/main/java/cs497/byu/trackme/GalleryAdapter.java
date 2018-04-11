@@ -23,7 +23,7 @@ import java.util.Map;
 
 public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
 
-    private Map<String, HashSet<Bitmap>> small_to_large_photos;
+    private Map<LatLng, HashSet<Bitmap>> small_to_large_photos;
     private Activity galleryActivity;
     private List<Bitmap> allPictures; // All the pictures in the app will be saved to this list
     private LatLng keyPosition;
@@ -38,7 +38,7 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
     private List<Bitmap> getAllPictures() {
         List<Bitmap> list = new ArrayList<>();
 
-        for (Map.Entry<String, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
+        for (Map.Entry<LatLng, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
             for (Bitmap image : map.getValue()) {
                 list.add(image);
             }
@@ -59,8 +59,8 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
     @Override
     public void onBindViewHolder(GalleryHolder holder, int position) {
 
-        for (Map.Entry<String, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
-            if (keyPosition.toString().equals(map.getKey())) {
+        for (Map.Entry<LatLng, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
+            if (keyPosition == map.getKey()) {
                 for (Bitmap image : map.getValue()) {
 
                     // This ensures that every image will be listed in the recycler view.
@@ -80,6 +80,6 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
 
     @Override
     public int getItemCount() {
-         return Model.SINGLETON.getTotalPicCount(keyPosition.toString());
+         return Model.SINGLETON.getTotalPicCount(keyPosition);
     }
 }
