@@ -86,4 +86,5 @@
     <string name="title_activity_test">test</string>
 
     <string name="facebook_app_id">1453216041471294</string>
+    <string name="is_this_your_hike">Is this your hike?</string>
 </resources>

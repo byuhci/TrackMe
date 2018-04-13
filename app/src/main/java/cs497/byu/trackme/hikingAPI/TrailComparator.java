@@ -14,11 +14,33 @@ public class TrailComparator implements Comparator<Trail> {
 
     @Override
     public int compare(Trail t1, Trail t2) {
-        return 0;
+        if (t1.getDistFromUser() <= 100 && t2.getDistFromUser() <= 100)
+            return compareByVotes(t1, t2);
+        else {
+            if (t1.getDistFromUser() - t2.getDistFromUser() >= 100 || t2.getDistFromUser() - t1.getDistFromUser() >= 100) {
+                if(Double.compare(t1.getDistFromUser(), t2.getDistFromUser()) == 0)
+                    return compareByVotes(t1, t2);
+                else return Double.compare(t1.getDistFromUser(), t2.getDistFromUser());
+            } else {
+                return compareByVotes(t1, t2);
+            }
+        }
     }
 
-    private double getDistanceFromStart(Trail trail){
-        return Math.sqrt(Math.pow(Math.abs(latitude - trail.getLatitude()), 2) + Math.pow(Math.abs(longitude - trail.getLongitude()), 2));
+    private int compareByVotes(Trail t1, Trail t2) {
+        if (t1.getStarVotes() > t2.getStarVotes())
+            return -1;
+        else if (t1.getStarVotes() < t2.getStarVotes())
+            return 1;
+        else {
+            if (t1.getStars() > t2.getStars())
+                return -1;
+            else if (t1.getStars() < t2.getStars())
+                return 1;
+            else
+                return Double.compare(t1.getLength(), t2.getLength());
+
+        }
     }
 
 

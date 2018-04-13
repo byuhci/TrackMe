@@ -1,5 +1,7 @@
 package cs497.byu.trackme.hikingAPI;
 
+import android.location.Location;
+
 /**
  * Model class for Hiking Project API's trail object
  * Created by Nate on 3/10/2018.
@@ -12,7 +14,7 @@ public class Trail {
     private String summary;
     private String difficulty;
     private double stars;
-    private String starVotes;
+    private double starVotes;
     private String location;
     private String url;
     private String imgSqSmall;
@@ -24,22 +26,22 @@ public class Trail {
     private double descent;
     private double high;
     private double low;
-    private double numLat;
-    private double numLong;
-    private String longitude;
-    private String latitude;
+    private double longitude;
+    private double latitude;
     private String conditionStatus;
     private String conditionDetails;
     private String conditionDate;
-    private double distFromLocation;
+
+    private float distFromUser;
+    private Location trailHeadLocation;
 
     public Trail() {
     }
 
     public Trail(String id, String name, String type, String summary, String difficulty,
-                 double stars, String starVotes, String location, String url, String imgSqSmall,
+                 double stars, double starVotes, String location, String url, String imgSqSmall,
                  String imgSmall, String imgSmallMed, String imgMedium, double length,
-                 double ascent, double descent, double high, double low, String longitude, String latitude,
+                 double ascent, double descent, double high, double low, double longitude, double latitude,
                  String conditionStatus, String conditionDetails, String conditionDate) {
         this.id = id;
         this.name = name;
@@ -114,11 +116,11 @@ public class Trail {
         this.stars = stars;
     }
 
-    public String getStarVotes() {
+    public double getStarVotes() {
         return starVotes;
     }
 
-    public void setStarVotes(String starVotes) {
+    public void setStarVotes(double starVotes) {
         this.starVotes = starVotes;
     }
 
@@ -211,18 +213,18 @@ public class Trail {
     }
 
     public double getLongitude() {
-        return numLong;
+        return trailHeadLocation.getLongitude();
     }
 
-    public void setLongitude(String longitude) {
+    public void setLongitude(float longitude) {
         this.longitude = longitude;
     }
 
     public double getLatitude() {
-        return numLat;
+        return trailHeadLocation.getLatitude();
     }
 
-    public void setLatitude(String latitude) {
+    public void setLatitude(float latitude) {
         this.latitude = latitude;
     }
 
@@ -250,10 +252,22 @@ public class Trail {
         this.conditionDate = conditionDate;
     }
 
-    public void fixCoords(double lat, double lon) {
-        numLat = Double.parseDouble(latitude);
-        numLong = Double.parseDouble(longitude);
+    public float getDistFromUser() {
+        return distFromUser;
+    }
 
-        distFromLocation = Math.sqrt(Math.pow(Math.abs(numLat - lat), 2) + Math.pow(Math.abs(numLong - lon), 2));
+    public Location getTrailHeadLocation() {
+        return trailHeadLocation;
+    }
+
+    public void fixCoords(double lat, double lon) {
+        trailHeadLocation = new Location("");
+        trailHeadLocation.setLatitude(latitude);
+        trailHeadLocation.setLongitude(longitude);
+
+        Location loc2 = new Location("");
+        loc2.setLatitude(lat);
+        loc2.setLongitude(lon);
+        distFromUser = trailHeadLocation.distanceTo(loc2);
     }
 }

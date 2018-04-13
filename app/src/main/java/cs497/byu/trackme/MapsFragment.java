@@ -77,17 +77,22 @@ import java.io.InputStream;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
 import cs497.byu.trackme.com.hs.gpxparser.modal.GPX;
 import cs497.byu.trackme.com.hs.gpxparser.modal.Waypoint;
 import cs497.byu.trackme.hikingAPI.GetTrailsResponseList;
 import cs497.byu.trackme.hikingAPI.Trail;
+import cs497.byu.trackme.hikingAPI.TrailComparator;
 import cs497.byu.trackme.model.LocationMarker;
 import cs497.byu.trackme.model.ProfileData;
 
@@ -145,6 +150,7 @@ public class MapsFragment extends Fragment
     static final String HIKING_PROJECT_KEY = "200230210-03d0722caf5c7e27136640b7f114f736";
     double lat;
     double lon;
+    private List<Trail> closeHikes;
 
 
     @Override
@@ -238,6 +244,7 @@ public class MapsFragment extends Fragment
         }
     }
 
+    //----------Hike---------------//
     private void getHike() {
         /**
          * TODO: send request to hiking api
@@ -256,7 +263,7 @@ public class MapsFragment extends Fragment
         StringRequest stringRequest = new StringRequest(Request.Method.GET, requestURL, new Response.Listener<String>() {
             @Override
             public void onResponse(String response) {
-                findClosestHike(response);
+                closeHikes = findClosestHike(response);
                 startRecordingHike();
             }
         }, new Response.ErrorListener() {
@@ -270,16 +277,39 @@ public class MapsFragment extends Fragment
         queue.add(stringRequest);
     }
 
-    private void findClosestHike(String json){
+
+
+    private List<Trail> findClosestHike(String json){
         List<Trail> trails = parseHikes(json);
-//        Arrays.sort(trails.toArray(), );
-        int foo = 0;
+
+        Collections.sort(trails, new TrailComparator(lat, lon));
+
+        return trails;
     }
 
     private List<Trail> parseHikes(String hikingApiJson) {
         Gson gson = new Gson();
 
         return gson.fromJson(hikingApiJson, GetTrailsResponseList.class).fixCoords(lat, lon).getTrails();
+    }
+
+    /**
+     * show a dialog where user confirms we selected the trail they plan to hike
+     */
+    private void startHike_confirmHike(){
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+
+
+
+    }
+
+
+    /**
+     * we couldn't automatically determine the trail the user plans to hike
+     * show a dialog where user enters distance they will hike
+     */
+    private void startHike_enterHikeDistance(){
+
     }
 
     private void startRecordingHike() {
@@ -383,6 +413,7 @@ public class MapsFragment extends Fragment
 //        if (TESTMODE) {
 //            useTestData();
 //        } else {
+        if(mGoogleApiClient == null) buildGoogleApiClient();
             mLocationRequest = new LocationRequest();
             int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
             mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
