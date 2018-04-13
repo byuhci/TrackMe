@@ -27,7 +27,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.support.v4.app.Fragment;
 
@@ -48,7 +50,6 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -74,18 +75,14 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 
 import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
 import cs497.byu.trackme.com.hs.gpxparser.modal.GPX;
@@ -151,6 +148,7 @@ public class MapsFragment extends Fragment
     double lat;
     double lon;
     private List<Trail> closeHikes;
+    private double trailLengthInMeters;
 
 
     @Override
@@ -173,8 +171,7 @@ public class MapsFragment extends Fragment
         if (ProfileData.getInstance().getUserType().equals(ProfileData.USER.HIKER)) {
             mStartButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    getHike();
-//                    startRecordingHike();
+                    getTrail();
                     mFinishButton.setVisibility(View.VISIBLE);
                 }
             });
@@ -194,7 +191,6 @@ public class MapsFragment extends Fragment
 
         small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
         allPictures = Model.SINGLETON.getAllPictures();
-//        mLastLocation = Model.SINGLETON.getLastLocationSaved();
 
         Button camera = rootView.findViewById(R.id.button_camera);
         camera.setOnClickListener(new View.OnClickListener() {
@@ -202,8 +198,7 @@ public class MapsFragment extends Fragment
             public void onClick(View v) {
                 if (mLastLocation != null) {
                     openCamera();
-                }
-                else {
+                } else {
                     Toast.makeText(getActivity(), "Still retrieving GPS signal", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -217,7 +212,6 @@ public class MapsFragment extends Fragment
 
         return rootView;
     }
-
 
 
     private void useTestData() {
@@ -245,10 +239,7 @@ public class MapsFragment extends Fragment
     }
 
     //----------Hike---------------//
-    private void getHike() {
-        /**
-         * TODO: send request to hiking api
-         */
+    private void getTrail() {
 
         RequestQueue queue = Volley.newRequestQueue(this.getContext());
 
@@ -263,14 +254,13 @@ public class MapsFragment extends Fragment
         StringRequest stringRequest = new StringRequest(Request.Method.GET, requestURL, new Response.Listener<String>() {
             @Override
             public void onResponse(String response) {
-                closeHikes = findClosestHike(response);
-                startRecordingHike();
+                confirmTrail(findClosestHike(response).get(0));
             }
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-
-                startRecordingHike();
+                getTrailLengthFromUser();
+                startRecordingHike(0.0);
             }
         });
 
@@ -278,8 +268,7 @@ public class MapsFragment extends Fragment
     }
 
 
-
-    private List<Trail> findClosestHike(String json){
+    private List<Trail> findClosestHike(String json) {
         List<Trail> trails = parseHikes(json);
 
         Collections.sort(trails, new TrailComparator(lat, lon));
@@ -295,12 +284,47 @@ public class MapsFragment extends Fragment
 
     /**
      * show a dialog where user confirms we selected the trail they plan to hike
+     *
+     * @param closestHike
      */
-    private void startHike_confirmHike(){
+    private void confirmTrail(final Trail closestHike) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        LayoutInflater inflater = getActivity().getLayoutInflater();
 
+        View view = inflater.inflate(R.layout.dialog_confirm_hike, null);
 
+        TextView hikeName = view.findViewById(R.id.hike_name);
+        hikeName.setText(closestHike.getName());
 
+        TextView hikeLength = view.findViewById(R.id.hike_length);
+        String trailLength = closestHike.getLength() + " miles long";
+        hikeLength.setText(trailLength);
+
+        Button confirmHikeButton = view.findViewById(R.id.confirm_hike_button);
+
+        Button wrongHikeButton = view.findViewById(R.id.wrong_hike_button);
+
+        builder.setView(view);
+
+        final AlertDialog confirmTrailDialog = builder.create();
+
+        confirmHikeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startRecordingHike(closestHike.getLength());
+                confirmTrailDialog.cancel();
+            }
+        });
+
+        wrongHikeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                getTrailLengthFromUser();
+                confirmTrailDialog.cancel();
+            }
+        });
+
+        confirmTrailDialog.show();
     }
 
 
@@ -308,11 +332,36 @@ public class MapsFragment extends Fragment
      * we couldn't automatically determine the trail the user plans to hike
      * show a dialog where user enters distance they will hike
      */
-    private void startHike_enterHikeDistance(){
+    private void getTrailLengthFromUser() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        LayoutInflater inflater = getActivity().getLayoutInflater();
+        View view = inflater.inflate(R.layout.dialog_set_hike_length, null);
 
+        final EditText editText = view.findViewById(R.id.user_input_hike_length);
+
+        Button setHikeLengthButton = view.findViewById(R.id.set_hike_length_button);
+
+        builder.setView(view);
+
+        final AlertDialog getLengthDialog = builder.create();
+
+        setHikeLengthButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (editText.getText().toString().trim().length() > 0){
+                    double trailLength = Double.parseDouble(editText.getText().toString());
+
+                    startRecordingHike(trailLength);
+                    getLengthDialog.cancel();
+                }
+            }
+        });
+
+        getLengthDialog.show();
     }
 
-    private void startRecordingHike() {
+    private void startRecordingHike(double trailLengthInMeters) {
+        this.trailLengthInMeters = trailLengthInMeters;
         clearData();
         mStartButton.setVisibility(View.INVISIBLE);
 
@@ -370,7 +419,7 @@ public class MapsFragment extends Fragment
         mClusterManager.setOnClusterClickListener(new ClusterManager.OnClusterClickListener<MarkerCluster>() {
             @Override
             public boolean onClusterClick(Cluster<MarkerCluster> cluster) {
-                Toast.makeText(getActivity(),cluster.getSize() + " in this cluster!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), cluster.getSize() + " in this cluster!", Toast.LENGTH_SHORT).show();
                 Model.SINGLETON.setLastLocationSaved(cluster.getPosition());
                 Intent intent = new Intent(getActivity(), GalleryActivity.class);
                 intent.setFlags(intent.getFlags() | Intent.FLAG_ACTIVITY_NO_HISTORY); // Prevents the gallery activity from being added to the backstack
@@ -413,15 +462,15 @@ public class MapsFragment extends Fragment
 //        if (TESTMODE) {
 //            useTestData();
 //        } else {
-        if(mGoogleApiClient == null) buildGoogleApiClient();
-            mLocationRequest = new LocationRequest();
-            int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
-            mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
-            mLocationRequest.setFastestInterval(1000 * numberOfSeconds);
-            mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-            if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
-            }
+        if (mGoogleApiClient == null) buildGoogleApiClient();
+        mLocationRequest = new LocationRequest();
+        int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
+        mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
+        mLocationRequest.setFastestInterval(1000 * numberOfSeconds);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
+        }
 //        }
     }
 
@@ -435,6 +484,7 @@ public class MapsFragment extends Fragment
 
     /**
      * This function only works for the hiker. It updates the firebase database with his/her current location
+     *
      * @param location
      */
     @Override
@@ -538,7 +588,6 @@ public class MapsFragment extends Fragment
 
     /**
      * This is where the observer receives the location of the hiker.
-     *
      */
     //Start listening to the database
     private void attachDatabaseReadListener() {
@@ -675,7 +724,7 @@ public class MapsFragment extends Fragment
 //        if (ContextCompat.checkSelfPermission(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
 //                ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED &&
 //                ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ) {
-            // Should we show an explanation?
+        // Should we show an explanation?
 //            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION)) {
 //                // Show an explanation to the user *asynchronously* -- don't block
 //                // this thread waiting for the user's response! After the user
@@ -696,18 +745,18 @@ public class MapsFragment extends Fragment
 //                        .create()
 //                        .show();
 //            } else {
-                // No explanation needed, we can request the permission.
-            String[] permissions = { Manifest.permission.CAMERA,
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_EXTERNAL_STORAGE };
+        // No explanation needed, we can request the permission.
+        String[] permissions = {Manifest.permission.CAMERA,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE};
 
 //            ActivityCompat.requestPermissions(getActivity(), permissions, RC_PERMISSIONS);
 //        }
-                ActivityCompat.requestPermissions(getActivity(),
+        ActivityCompat.requestPermissions(getActivity(),
 //                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-                        permissions,
-                        MY_PERMISSIONS_REQUEST_LOCATION);
+                permissions,
+                MY_PERMISSIONS_REQUEST_LOCATION);
 
 //            }
 //        }
@@ -738,20 +787,15 @@ public class MapsFragment extends Fragment
     }
 
 
-
-
-
-
-
-
-
-    /** CODE OF NATHAN GERONIMO */
-    public Bitmap stringToBitMap(String encodedString){
+    /**
+     * CODE OF NATHAN GERONIMO
+     */
+    public Bitmap stringToBitMap(String encodedString) {
         try {
-            byte [] encodeByte=Base64.decode(encodedString,Base64.DEFAULT);
+            byte[] encodeByte = Base64.decode(encodedString, Base64.DEFAULT);
             Bitmap bitmap = BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
             return ThumbnailUtils.extractThumbnail(bitmap, 150, 150); // Return the thumbnail
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.getMessage();
             return null;
         }
@@ -766,12 +810,10 @@ public class MapsFragment extends Fragment
         File storageDir = new File(storage, APP_TAG);
         if (storageDir.exists()) {
             Log.d(APP_TAG, "directory exists!");
-        }
-        else {
+        } else {
             if (storageDir.mkdirs()) {
                 Log.d(APP_TAG, "Directory created!");
-            }
-            else {
+            } else {
                 Log.d(APP_TAG, "Failed to create directory");
             }
         }
@@ -809,13 +851,11 @@ public class MapsFragment extends Fragment
     private void insertPictureToMap(LatLng currLoc, Bitmap image) {
 
 
-
         if (small_to_large_photos.isEmpty()) { // If the map has no markers
             HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
             newSet.add(image);
             small_to_large_photos.put(currLoc, newSet);
-        }
-        else {
+        } else {
             double result = 0;
             for (LatLng locationKey : small_to_large_photos.keySet()) {
 //                float[] result = new float[1];
@@ -823,8 +863,7 @@ public class MapsFragment extends Fragment
                 result = distanceBetween(locationKey.latitude, locationKey.longitude, currLoc.latitude, currLoc.longitude);
                 if (result <= 2) { // if distance between first and second location is less than 2m
                     small_to_large_photos.get(locationKey).add(image); // just add the image to the existing set
-                }
-                else {
+                } else {
                     HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
                     newSet.add(image);
                     small_to_large_photos.put(currLoc, newSet);
@@ -924,7 +963,7 @@ public class MapsFragment extends Fragment
             Bitmap takenImage = (Bitmap) extras.get("data"); // Grabs the photo taken.
             Bitmap rescaledImage = takenImage;
             Uri targetUri = data.getData();
-            if(targetUri != null) {
+            if (targetUri != null) {
                 DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
                 rescaledImage = getScaledBitmapFromUri(getContext(), targetUri);
 //                imageView.setImageBitmap(photo);
@@ -950,7 +989,7 @@ public class MapsFragment extends Fragment
 
 
             // Make the thumbnail for the map
-            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
+            thumbnail = ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
             String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + File.separator + mLastPhotoTimeStamp;
             addToCluster(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
 //            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
@@ -1001,8 +1040,7 @@ public class MapsFragment extends Fragment
             if (isObserver) {
                 mClusterImageView.setImageDrawable(new BitmapDrawable(item.getThumbnail()));
                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(item.getThumbnail()));
-            }
-            else {
+            } else {
                 mClusterImageView.setImageDrawable(new BitmapDrawable(thumbnail));
                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(thumbnail));
             }
@@ -1018,8 +1056,7 @@ public class MapsFragment extends Fragment
                 mClusterImageView.setImageDrawable(new BitmapDrawable(newThumbnail));
                 Bitmap icon = mClusterIconGenerator.makeIcon(String.valueOf(cluster.getSize()));
                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));
-            }
-            else {
+            } else {
                 mClusterImageView.setImageDrawable(new BitmapDrawable(thumbnail));
                 Bitmap icon = mClusterIconGenerator.makeIcon(String.valueOf(cluster.getSize()));
                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));

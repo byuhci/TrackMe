@@ -86,5 +86,11 @@
     <string name="title_activity_test">test</string>
 
     <string name="facebook_app_id">1453216041471294</string>
-    <string name="is_this_your_hike">Is this your hike?</string>
+    <string name="is_this_your_hike">Is the trail you want to hike?</string>
+    <string name="yes">yes</string>
+    <string name="no">no</string>
+    <string name="confirm">confirm</string>
+    <string name="distance_in_miles">distance in miles</string>
+    <string name="miles">miles</string>
+    <string name="how_far_do_you_plan_to_hike">How far do you plan to hike?</string>
 </resources>

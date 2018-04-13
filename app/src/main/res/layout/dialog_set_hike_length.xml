@@ -10,7 +10,7 @@
         android:layout_height="wrap_content"
         android:background="@color/colorPrimaryDark"
         android:padding="14dp"
-        android:text="@string/is_this_your_hike"
+        android:text="@string/how_far_do_you_plan_to_hike"
         android:textAlignment="center"
         android:textColor="@android:color/white"
         android:textSize="20sp" />
@@ -18,43 +18,35 @@
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:layout_gravity="center">
-
-        <TextView
-            android:id="@+id/hike_name"
+        <EditText
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:padding="8dp"
-            android:textAlignment="center" />
+            android:inputType="number"
+            android:id="@+id/user_input_hike_length"
+            android:hint="@string/distance_in_miles"/>
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            android:textAlignment="center"
-            android:id="@+id/hike_length"/>
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAlignment="center"
+        android:text="@string/miles"
+        android:id="@+id/hike_name"/>
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:layout_gravity="center">
+
+
 
         <Button
-            android:id="@+id/wrong_hike_button"
+            android:id="@+id/set_hike_length_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/no"
-            android:textAlignment="center"
-            android:textColor="@android:color/white"
-            android:textSize="20sp" />
-
-        <Button
-            android:id="@+id/confirm_hike_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/yes"
+            android:text="@string/confirm"
             android:textAlignment="center"
             android:textColor="@android:color/white"
             android:textSize="20sp" />
