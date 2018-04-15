@@ -18,8 +18,8 @@ import java.util.Date;
 public class LocationMarker {
 
     //Location location;
-    //Calendar calendar;
 
+    //Calendar calendar;
     private double latitude;
     private double longitude;
     private String formattedTime;
@@ -28,13 +28,17 @@ public class LocationMarker {
     private double speed;
     private double elevation;
     private double returnTime;
+    private double trailLengthInMeters;
     private String thumbnail;
+    private double totalDistanceTravelledInMeters;
+    private double currentSpeedInMetersPerSecond;
+    private double startTime;
 
     public LocationMarker() {
     }
 
     public LocationMarker(double latitude, double longitude, String formattedTime, long readableTime,
-                          long exactTime, double elevation, double speed, double returnTime, String thumbnail) {
+                          long exactTime, double elevation, double speed, double returnTime, double trailLengthInMeters, double totalDistanceTravelledInMeters, double currentSpeedInMetersPerSecond, double startTime, String thumbnail) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.formattedTime = formattedTime;
@@ -44,6 +48,10 @@ public class LocationMarker {
         this.speed = speed;
         this.returnTime = returnTime;
         this.thumbnail = thumbnail;
+        this.trailLengthInMeters = trailLengthInMeters;
+        this.totalDistanceTravelledInMeters = totalDistanceTravelledInMeters;
+        this.currentSpeedInMetersPerSecond = currentSpeedInMetersPerSecond;
+        this.startTime = startTime;
     }
 
     //----Getters and Setters---//
@@ -122,6 +130,38 @@ public class LocationMarker {
 
     public void setThumbnail(String thumbnail) {
         this.thumbnail = thumbnail;
+    }
+
+    public double getTrailLengthInMeters() {
+        return trailLengthInMeters;
+    }
+
+    public void setTrailLengthInMeters(double trailLengthInMeters) {
+        this.trailLengthInMeters = trailLengthInMeters;
+    }
+
+    public double getTotalDistanceTravelledInMeters() {
+        return totalDistanceTravelledInMeters;
+    }
+
+    public void setTotalDistanceTravelledInMeters(double totalDistanceTravelledInMeters) {
+        this.totalDistanceTravelledInMeters = totalDistanceTravelledInMeters;
+    }
+
+    public double getCurrentSpeedInMetersPerSecond() {
+        return currentSpeedInMetersPerSecond;
+    }
+
+    public void setCurrentSpeedInMetersPerSecond(double currentSpeedInMetersPerSecond) {
+        this.currentSpeedInMetersPerSecond = currentSpeedInMetersPerSecond;
+    }
+
+    public double getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(double startTime) {
+        this.startTime = startTime;
     }
 
     /*

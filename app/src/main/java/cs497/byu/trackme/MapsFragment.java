@@ -2,7 +2,6 @@ package cs497.byu.trackme;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -55,6 +54,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.firebase.database.DatabaseException;
 import com.google.gson.Gson;
 import com.google.maps.android.clustering.Cluster;
 import com.google.maps.android.clustering.ClusterManager;
@@ -131,7 +131,7 @@ public class MapsFragment extends Fragment
 
     // ADDED BY NATHAN GERONIMO
     public static final int RC_PERMISSIONS = 1000;
-    private final int UPDATE_LOCATION_INTERVAL = 30;
+    private final int UPDATE_LOCATION_INTERVAL = 10;
     private final int CAMERA_REQUST_CODE = 11;
     private final String APP_TAG = "TrackMe";
     private File mCurrentPhotoPath;
@@ -149,6 +149,10 @@ public class MapsFragment extends Fragment
     double lon;
     private List<Trail> closeHikes;
     private double trailLengthInMeters;
+    private static final double METERS_PER_MILE = 1609.34;
+    private long lastTimeUpdateInSeconds;
+    private double totalDistanceTraveledInMeters = 0;
+    private double returnTime;
 
 
     @Override
@@ -229,7 +233,7 @@ public class MapsFragment extends Fragment
 
                 //Store in Firebase
                 //TODO: THIS IS BROKEN! Return time cannot be 5
-                LocationMarker newLocationMarker = new LocationMarker(waypoints.get(i).getLatitude(), waypoints.get(i).getLongitude(), waypoints.get(i).getTime().toString(), i / 60, 24, waypoints.get(i).getElevation(), 2, 5, null);
+                LocationMarker newLocationMarker = new LocationMarker(waypoints.get(i).getLatitude(), waypoints.get(i).getLongitude(), waypoints.get(i).getTime().toString(), i / 60, 24, waypoints.get(i).getElevation(), 2, 5, trailLengthInMeters, totalDistanceTraveledInMeters, 0, 0, null);
                 mLastLocationMarker = newLocationMarker;
                 mMessageDataBaseReference.push().setValue(newLocationMarker);
             }
@@ -260,7 +264,6 @@ public class MapsFragment extends Fragment
             @Override
             public void onErrorResponse(VolleyError error) {
                 getTrailLengthFromUser();
-                startRecordingHike(0.0);
             }
         });
 
@@ -348,7 +351,7 @@ public class MapsFragment extends Fragment
         setHikeLengthButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (editText.getText().toString().trim().length() > 0){
+                if (editText.getText().toString().trim().length() > 0) {
                     double trailLength = Double.parseDouble(editText.getText().toString());
 
                     startRecordingHike(trailLength);
@@ -360,8 +363,8 @@ public class MapsFragment extends Fragment
         getLengthDialog.show();
     }
 
-    private void startRecordingHike(double trailLengthInMeters) {
-        this.trailLengthInMeters = trailLengthInMeters;
+    private void startRecordingHike(double trailLengthInMiles) {
+        this.trailLengthInMeters = trailLengthInMiles * METERS_PER_MILE;
         clearData();
         mStartButton.setVisibility(View.INVISIBLE);
 
@@ -468,10 +471,19 @@ public class MapsFragment extends Fragment
         mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
         mLocationRequest.setFastestInterval(1000 * numberOfSeconds);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
-        }
+        doLocationStuff();
 //        }
+    }
+
+    private void doLocationStuff() {
+        if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
+            } catch (IllegalStateException e) {
+                buildGoogleApiClient();
+                doLocationStuff();
+            }
+        }
     }
 
     @Override
@@ -491,6 +503,7 @@ public class MapsFragment extends Fragment
     public void onLocationChanged(Location location) {
 
         System.out.println("onLocationChanged");
+        Location previousLocation = mLastLocation;
         mLastLocation = location;
 
         //Place current location marker
@@ -501,21 +514,66 @@ public class MapsFragment extends Fragment
         SimpleDateFormat df = new SimpleDateFormat("HH:mm"); //"yyyy-MM-dd HH:mm:ss"
         String formattedDate = df.format(calendar.getTime());
 
+        long currentTimeInSeconds = System.currentTimeMillis() / 1000;
+        long numSecondsSinceLastUpdate = currentTimeInSeconds - lastTimeUpdateInSeconds;
+        lastTimeUpdateInSeconds = currentTimeInSeconds;
+
+
         //Get a time estimate
-        double returnTime = 0;
+//        this.returnTime = 0.0;
+        double startTime = currentTimeInSeconds;
+        double currentSpeedInMetersPerSecond = 0;
         if (mapMarkers.size() > 1) {
-            LocationMarker lastMarker = mapMarkers.get(mapMarkers.size() - 1);
-            double totalDistanceInMeters = distanceBetween(latLng.latitude, latLng.longitude, lastMarker.getLatitude(), lastMarker.getLongitude());
-            //5000 meters per hour is average walking speed
-            //or 84 meters per minute
-            double averageRate = 1.4; //1.4m per second
-            returnTime = (totalDistanceInMeters / averageRate);
-            returnTime += mapMarkers.get(mapMarkers.size() - 2).getReturnTime(); //Add the time from the previous one.
+
+//            if(mapMarkers.get(0).getStartTime() != 0)
+            for (LocationMarker locationMarker : mapMarkers) {
+                if (locationMarker.getStartTime() != 0) {
+                    startTime = mapMarkers.get(0).getStartTime();
+                    break;
+                }
+            }
+            if (trailLengthInMeters <= 0) {
+                for (LocationMarker locationMarker : mapMarkers) {
+                    if (locationMarker.getTrailLengthInMeters() > 0)
+                        trailLengthInMeters = locationMarker.getTrailLengthInMeters();
+                    break;
+                }
+            }
+
+            if (totalDistanceTraveledInMeters <= 0) {
+                for (int i = mapMarkers.size() - 1; i >= 0; i--) {
+                    if (mapMarkers.get(i).getTotalDistanceTravelledInMeters() > 0)
+                        totalDistanceTraveledInMeters = mapMarkers.get(i).getTotalDistanceTravelledInMeters();
+                }
+            }
+
+            double distanceTraveledSinceLastUpdate = distanceBetween(mLastLocation.getLatitude(), mLastLocation.getLongitude(), location.getLatitude(), location.getLongitude());
+            totalDistanceTraveledInMeters += distanceTraveledSinceLastUpdate;
+
+            currentSpeedInMetersPerSecond = distanceTraveledSinceLastUpdate / numSecondsSinceLastUpdate;
+            if (currentSpeedInMetersPerSecond <= 0) currentSpeedInMetersPerSecond = 1.4;
+
+            double remainingDistanceInMeters = trailLengthInMeters - totalDistanceTraveledInMeters;
+            returnTime = remainingDistanceInMeters / currentSpeedInMetersPerSecond;
+//            returnTime = currentTimeInSeconds + remainingTime;
+
+//            LocationMarker lastMarker = mapMarkers.get(mapMarkers.size() - 1);
+//            double totalDistanceInMeters = distanceBetween(latLng.latitude, latLng.longitude, lastMarker.getLatitude(), lastMarker.getLongitude());
+//            //5000 meters per hour is average walking speed
+//            //or 84 meters per minute
+//
+//            double averageRate = 1.4; //1.4m per second
+//            returnTime = (totalDistanceInMeters / averageRate);
+//            returnTime += mapMarkers.get(mapMarkers.size() - 2).getReturnTime(); //Add the time from the previous one.
         }
 
         //Store in Firebase
-        LocationMarker newLocationMarker = new LocationMarker(latLng.latitude, latLng.longitude, formattedDate, location.getTime(), location.getElapsedRealtimeNanos(), location.getAltitude(), location.getSpeed(), returnTime, null);
-        mMessageDataBaseReference.push().setValue(newLocationMarker);
+        LocationMarker newLocationMarker = new LocationMarker(latLng.latitude, latLng.longitude, formattedDate, location.getTime(), location.getElapsedRealtimeNanos(), location.getAltitude(), location.getSpeed(), returnTime, trailLengthInMeters, totalDistanceTraveledInMeters, currentSpeedInMetersPerSecond, startTime, null);
+        try {
+            mMessageDataBaseReference.push().setValue(newLocationMarker);
+        } catch (DatabaseException e) {
+            e.printStackTrace();
+        }
         mLastLocationMarker = newLocationMarker;
     }
 
@@ -592,6 +650,7 @@ public class MapsFragment extends Fragment
     //Start listening to the database
     private void attachDatabaseReadListener() {
         if (mChildEventListener == null) {
+
             mChildEventListener = new ChildEventListener() {
                 @Override //Called when a message is added.
                 public void onChildAdded(DataSnapshot dataSnapshot, String s) {
@@ -599,6 +658,9 @@ public class MapsFragment extends Fragment
 
                     //dataSnapshot is a "snapshot" instance of the database, and in this case, will be the new added message.
                     LocationMarker newLocationMarker = dataSnapshot.getValue(LocationMarker.class);
+                    if (trailLengthInMeters > 0)
+                        newLocationMarker.setTrailLengthInMeters(trailLengthInMeters);
+                    lastTimeUpdateInSeconds = System.currentTimeMillis() / 1000;
                     mapMarkers.add(newLocationMarker);
 
                     // update current position
@@ -624,6 +686,19 @@ public class MapsFragment extends Fragment
                                 if (distance < 10) { //Within 20 meters
                                     closestMarker = mapMarkers.get(i);
                                 }
+                            }
+
+
+                            if (closestMarker.getTotalDistanceTravelledInMeters() == 0) {
+                                double totalTime = System.currentTimeMillis()/1000 - closestMarker.getStartTime();
+                                closestMarker.setTotalDistanceTravelledInMeters(totalTime/1.4);
+                            }
+                            if (closestMarker.getReturnTime() == 0) {
+                                double speed;
+                                if (closestMarker.getCurrentSpeedInMetersPerSecond() == 0)
+                                    speed = 1.4;
+                                else speed = closestMarker.getCurrentSpeedInMetersPerSecond();
+                                closestMarker.setReturnTime((closestMarker.getTrailLengthInMeters() - closestMarker.getTotalDistanceTravelledInMeters()) / speed);
                             }
 
                             //Display the return time
