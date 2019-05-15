@@ -2,6 +2,8 @@ package cs497.byu.trackme;
 
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -20,11 +22,28 @@ public class SelectorActivity extends AppCompatActivity {
     private LinearLayout mHikeOption;
     private LinearLayout mObserverOption;
 
+    private Intent _startServiceIntent;
+    private Intent _stopServiceIntent;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         hideActionBar();
         setContentView(R.layout.activity_selection);
+
+        _startServiceIntent = new Intent(this, HikingHubService.class);
+        _startServiceIntent.setAction(Constants.ACTION_START_SERVICE);
+
+        _stopServiceIntent = new Intent(this, HikingHubService.class);
+        _stopServiceIntent.setAction(Constants.ACTION_STOP_SERVICE);
+
+
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        Globals g = Globals.getInstance();
+        g.setHandler(mainHandler);
+
+
+        startService(_startServiceIntent);
 
 
         mHikeOption = (LinearLayout) findViewById(R.id.hike);

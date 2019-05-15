@@ -2,10 +2,8 @@ package cs497.byu.trackme;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -19,7 +17,6 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
 import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -42,7 +39,6 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -66,8 +62,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -76,9 +70,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import cs497.byu.trackme.com.hs.gpxparser.GPXParser;
-import cs497.byu.trackme.com.hs.gpxparser.modal.GPX;
-import cs497.byu.trackme.com.hs.gpxparser.modal.Waypoint;
 import cs497.byu.trackme.model.LocationMarker;
 import cs497.byu.trackme.model.ProfileData;
 
@@ -89,7 +80,7 @@ public class MapsFragment extends Fragment
         implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+        LocationListener, Runnable {
 
     //Google Maps
     GoogleMap mGoogleMap;
@@ -101,7 +92,6 @@ public class MapsFragment extends Fragment
     Marker mFirstMarker;
 
     //Data
-    boolean TESTMODE = false;
     ArrayList<LocationMarker> mapMarkers = new ArrayList<>();
 
     //UI
@@ -119,18 +109,15 @@ public class MapsFragment extends Fragment
     public final String LOCATION_KEY = "LOCATION_KEY";
 
     // ADDED BY NATHAN GERONIMO
-    public static final int RC_PERMISSIONS = 1000;
-    private final int UPDATE_LOCATION_INTERVAL = 30;
+    private final int UPDATE_LOCATION_INTERVAL = 5;
     private final int CAMERA_REQUST_CODE = 11;
     private final String APP_TAG = "TrackMe";
-    private File mCurrentPhotoPath;
+    private static final String APP_TAG_STATIC = "TrackMe";
     private LocationMarker mLastLocationMarker;
     private boolean isObserver;
     private ClusterManager<MarkerCluster> mClusterManager;
     private Map<LatLng, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
     private Bitmap thumbnail;
-    private String mLastPhotoTimeStamp;
-    private List<Bitmap> allPictures; // Contains all the pitures ever saved
 
 
     @Override
@@ -172,7 +159,7 @@ public class MapsFragment extends Fragment
         }
 
         small_to_large_photos = Model.SINGLETON.getSmall_to_large_photos();
-        allPictures = Model.SINGLETON.getAllPictures();
+        //allPictures = Model.SINGLETON.getAllPictures();
 //        mLastLocation = Model.SINGLETON.getLastLocationSaved();
 
         Button camera = rootView.findViewById(R.id.button_camera);
@@ -195,32 +182,6 @@ public class MapsFragment extends Fragment
         }
 
         return rootView;
-    }
-
-
-
-    private void useTestData() {
-        GPXParser p = new GPXParser();
-        try {
-            AssetManager assetManager = getContext().getAssets();
-            InputStream inputStream = assetManager.open("River_run.gpx");
-            GPX gpx = p.parseGPX(inputStream);
-            ArrayList<Waypoint> waypoints = gpx.getTracks().iterator().next().getTrackSegments().iterator().next().getWaypoints();
-            for (int i = 0; i < waypoints.size(); i += 60) {
-                waypoints.get(i).getTime();
-                waypoints.get(i).getElevation();
-                waypoints.get(i).getLatitude();
-                waypoints.get(i).getLongitude();
-
-                //Store in Firebase
-                //TODO: THIS IS BROKEN! Return time cannot be 5
-                LocationMarker newLocationMarker = new LocationMarker(waypoints.get(i).getLatitude(), waypoints.get(i).getLongitude(), waypoints.get(i).getTime().toString(), i / 60, 24, waypoints.get(i).getElevation(), 2, 5, null);
-                mLastLocationMarker = newLocationMarker;
-                mMessageDataBaseReference.push().setValue(newLocationMarker);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private void startRecordingHike() {
@@ -275,7 +236,7 @@ public class MapsFragment extends Fragment
             }
         }
 
-        // Initialize the cluster manager once the map is ready to god
+        // Initialize the cluster manager once the map is ready to go
         mClusterManager = new ClusterManager<>(getContext(), mGoogleMap);
         mClusterManager.setRenderer(new MarkerRenderer());
         mClusterManager.setOnClusterClickListener(new ClusterManager.OnClusterClickListener<MarkerCluster>() {
@@ -321,9 +282,6 @@ public class MapsFragment extends Fragment
     }
 
     protected void startLocationUpdates() {
-//        if (TESTMODE) {
-//            useTestData();
-//        } else {
             mLocationRequest = new LocationRequest();
             int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
             mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
@@ -332,8 +290,9 @@ public class MapsFragment extends Fragment
             if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
             }
-//        }
     }
+
+    //region 
 
     @Override
     public void onConnectionSuspended(int i) {
@@ -350,11 +309,12 @@ public class MapsFragment extends Fragment
     @Override
     public void onLocationChanged(Location location) {
 
-        System.out.println("onLocationChanged");
+        System.out.println("-=-=-=-=-=onLocationChanged");
         mLastLocation = location;
 
         //Place current location marker
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        System.out.println("-=-=-=-=-=onLocationChanged-=-=-=-=got a latlng");
 
         //Get the time
         Calendar calendar = Calendar.getInstance();
@@ -364,8 +324,13 @@ public class MapsFragment extends Fragment
         //Get a time estimate
         double returnTime = 0;
         if (mapMarkers.size() > 1) {
+            System.out.println("-=-=-=-=-=onLocationChanged-=-=-=-=-More than one marker");
             LocationMarker lastMarker = mapMarkers.get(mapMarkers.size() - 1);
             double totalDistanceInMeters = distanceBetween(latLng.latitude, latLng.longitude, lastMarker.getLatitude(), lastMarker.getLongitude());
+            Globals g = Globals.getInstance();
+            double currentDist = g.getDistance();
+            g.setDistance(currentDist + totalDistanceInMeters);
+            System.out.println("-=-=-=-=-=onLocationChanged-=-=-=-=-setDistance");
             //5000 meters per hour is average walking speed
             //or 84 meters per minute
             double averageRate = 1.4; //1.4m per second
@@ -376,6 +341,7 @@ public class MapsFragment extends Fragment
         //Store in Firebase
         LocationMarker newLocationMarker = new LocationMarker(latLng.latitude, latLng.longitude, formattedDate, location.getTime(), location.getElapsedRealtimeNanos(), location.getAltitude(), location.getSpeed(), returnTime, null);
         mMessageDataBaseReference.push().setValue(newLocationMarker);
+        System.out.println("-=-=-=-=-=onLocationChanged-=-=-=-=-=Stored in Firebase...");
         mLastLocationMarker = newLocationMarker;
     }
 
@@ -456,11 +422,13 @@ public class MapsFragment extends Fragment
             mChildEventListener = new ChildEventListener() {
                 @Override //Called when a message is added.
                 public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                    System.out.println("onChildAdded");
+                    System.out.println("-=-=-=-=-=onChildAdded");
 
                     //dataSnapshot is a "snapshot" instance of the database, and in this case, will be the new added message.
                     LocationMarker newLocationMarker = dataSnapshot.getValue(LocationMarker.class);
                     mapMarkers.add(newLocationMarker);
+
+                    System.out.println("onChildAdded-=-=-=-=-=After mapMarkers.add()");
 
 
                     //Draw the marker
@@ -471,15 +439,20 @@ public class MapsFragment extends Fragment
                         addToCluster(pictureLatLng, stringToBitMap(newLocationMarker.getThumbnail()));
                     }
 
+                    System.out.println("onChildAdded-=-=-=-=-=After drawMarker() and addToCluster()");
+
                     //Update Time Estimate
                     if (getActivity() != null) {
+                        System.out.println("onChildAdded-=-=-=-=-=getActivity() not null");
                         {
                             //Find the closet Marker
                             LocationMarker closestMarker = newLocationMarker;
+                            float closestDistance = Float.MAX_VALUE;
                             for (int i = mapMarkers.size() - 1; i >= 0; i--) {
                                 float distance = distanceBetween(newLocationMarker.getLatitude(), newLocationMarker.getLongitude(), mapMarkers.get(i).getLatitude(), mapMarkers.get(i).getLongitude());
-                                if (distance < 10) { //Within 20 meters
+                                if (distance < closestDistance) {
                                     closestMarker = mapMarkers.get(i);
+                                    closestDistance = distance;
                                 }
                             }
 
@@ -494,6 +467,8 @@ public class MapsFragment extends Fragment
                     }
 
                 }
+
+                //region WORTHLESS OVERRIDES
 
                 @Override //When the contents gets edited
                 public void onChildChanged(DataSnapshot dataSnapshot, String s) {
@@ -510,6 +485,8 @@ public class MapsFragment extends Fragment
                 @Override //Some sort of error happens.
                 public void onCancelled(DatabaseError databaseError) {
                 }
+
+                //endregion
             };
             mMessageDataBaseReference.addChildEventListener(mChildEventListener);
         }
@@ -534,6 +511,8 @@ public class MapsFragment extends Fragment
         }
     }
 
+
+    //region STUPID STUFF
 
     //----------Saving States----------------//
     public void onSaveInstanceState(Bundle savedInstanceState) {
@@ -578,45 +557,13 @@ public class MapsFragment extends Fragment
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
 
     private void checkLocationPermission() {
-//        if (ContextCompat.checkSelfPermission(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-//                ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED &&
-//                ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ) {
-            // Should we show an explanation?
-//            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION)) {
-//                // Show an explanation to the user *asynchronously* -- don't block
-//                // this thread waiting for the user's response! After the user
-//                // sees the explanation, try again to request the permission.
-//                new AlertDialog.Builder(getActivity())
-//                        .setTitle("Location Permission Needed")
-////                        .setMessage("This app needs the Location permission, please accept to use location functionality")
-//                        .setMessage("This app needs the Location, Camera, and Gallery access permissions, please accept to use location functionality")
-//                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
-//                            @Override
-//                            public void onClick(DialogInterface dialogInterface, int i) {
-//                                //Prompt the user once explanation has been shown
-//                                ActivityCompat.requestPermissions(getActivity(),
-//                                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-//                                        MY_PERMISSIONS_REQUEST_LOCATION);
-//                            }
-//                        })
-//                        .create()
-//                        .show();
-//            } else {
-                // No explanation needed, we can request the permission.
             String[] permissions = { Manifest.permission.CAMERA,
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE,
                     Manifest.permission.READ_EXTERNAL_STORAGE };
-
-//            ActivityCompat.requestPermissions(getActivity(), permissions, RC_PERMISSIONS);
-//        }
                 ActivityCompat.requestPermissions(getActivity(),
-//                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
                         permissions,
                         MY_PERMISSIONS_REQUEST_LOCATION);
-
-//            }
-//        }
     }
 
     @Override
@@ -643,11 +590,7 @@ public class MapsFragment extends Fragment
         }
     }
 
-
-
-
-
-
+    //endregion STUPID STUFF
 
 
 
@@ -663,11 +606,43 @@ public class MapsFragment extends Fragment
         }
     }
 
-
-    private File createImageFile(File storage) throws IOException {
+    public static File createImageFileExternal(File storage) {
         // Create an image file title
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        mLastPhotoTimeStamp = timeStamp + ".jpg";
+        //mLastPhotoTimeStamp = timeStamp + ".jpg";
+        String photoName = timeStamp + "_";
+        File storageDir = new File(storage, APP_TAG_STATIC);
+        if (storageDir.exists()) {
+            Log.d(APP_TAG_STATIC, "directory exists!");
+        }
+        else {
+            if (storageDir.mkdirs()) {
+                Log.d(APP_TAG_STATIC, "Directory created!");
+            }
+            else {
+                Log.d(APP_TAG_STATIC, "Failed to create directory");
+            }
+        }
+
+        try {
+
+            File image = File.createTempFile(
+                    photoName,      /* prefix */
+                    ".jpg",   /* suffix */
+                    storageDir      /* directory */
+            );
+
+            return image;
+        } catch(Exception ex) {
+            return null;
+        }
+    }
+
+    public File createImageFile(File storage) throws IOException {
+        // Create an image file title
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        //Globals g = Globals.getInstance();
+        //g.setLastPhotoTimeStamp(timeStamp + ".jpg");
         String photoName = timeStamp + "_";
         File storageDir = new File(storage, APP_TAG);
         if (storageDir.exists()) {
@@ -688,17 +663,20 @@ public class MapsFragment extends Fragment
                 storageDir      /* directory */
         );
 
-        mCurrentPhotoPath = image.getAbsoluteFile();
+        //mCurrentPhotoPath = image.getAbsoluteFile();
         return image;
     }
 
     private void openCamera() {
+        System.out.println("-=-=-=-=-=openCamera()");
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         // Ensure that there's a camera activity to handle the intent
         if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+            System.out.println("-=-=-=-=-=openCamera()-=-=-=-=-=-=resolveActivity NOT NULL");
             // Create the File where the photo should go
             File photoFile = null;
             try {
+                System.out.println("-=-=-=-=-=openCamera()-=-=-=-=creating image file");
                 photoFile = createImageFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES));
             } catch (IOException ex) {
                 // Error occurred while creating the File
@@ -707,21 +685,25 @@ public class MapsFragment extends Fragment
             }
             // Continue only if the File was successfully created
             if (photoFile != null) {
+                System.out.println("-=-=-=-=-=openCamera()-=-=-=-=-=startActivityForResult");
                 startActivityForResult(takePictureIntent, CAMERA_REQUST_CODE);
             }
         }
     }
 
     private void insertPictureToMap(LatLng currLoc, Bitmap image) {
+        System.out.println("-=-=-=-=-=-=insertPictureToMap");
 
 
 
         if (small_to_large_photos.isEmpty()) { // If the map has no markers
+            System.out.println("-=-=-=-=-=-=small_to_large_photos.isEmpty()");
             HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
             newSet.add(image);
             small_to_large_photos.put(currLoc, newSet);
         }
         else {
+            System.out.println("=-=-=-=-=-=small_to_large_photos NOT empty");
             double result = 0;
             for (LatLng locationKey : small_to_large_photos.keySet()) {
 //                float[] result = new float[1];
@@ -737,31 +719,25 @@ public class MapsFragment extends Fragment
                 }
             }
         }
-
-//        if (small_to_large_photos.containsKey(stringKey)) { // If there's a key, then there's a set
-//            small_to_large_photos.get(stringKey).add(image); // So just add the image to that set
-//        }
-//        else {
-//            HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map
-//            newSet.add(image);
-//            small_to_large_photos.put(stringKey, newSet);
-//        }
-
     }
 
 
     private void addToCluster(LatLng location, Bitmap takenImage) {
+        System.out.println("-=-=-=-=-=addToCluster");
         String title = String.valueOf(location.latitude) + " " + String.valueOf(location.longitude);
         String snippet = "snip";
         Bitmap newThumbnail = ThumbnailUtils.extractThumbnail(takenImage, 150, 150);
         MarkerCluster item = new MarkerCluster(location.latitude, location.longitude, title, snippet, newThumbnail);
         mClusterManager.addItem(item);
         mClusterManager.cluster(); // Make the markers/clusters appear immediately
+        System.out.println("addToCluster-=-=-=-=-=After mClusterManager.cluster()");
         Toast.makeText(getActivity(), "Marker placed", Toast.LENGTH_SHORT).show();
 
         Log.e("LOCATION OF PIC TAKEN", location.toString());
         insertPictureToMap(item.getPosition(), takenImage);
-        allPictures.add(takenImage);
+        System.out.println("addToCluster-=-=-=-=-=After insertPictureToMap");
+        //allPictures.add(takenImage);
+        System.out.println("addToCluster-=-=-=-=-=After allPictures.add()");
     }
 
     public void savebitmap(Bitmap bmp, String fileName) throws IOException {
@@ -827,40 +803,29 @@ public class MapsFragment extends Fragment
 
             // Grab bitmap for photo taken
             Bundle extras = data.getExtras();
-            Bitmap takenImage = (Bitmap) extras.get("data"); // Grabs the photo taken.
-            Bitmap rescaledImage = takenImage;
             Uri targetUri = data.getData();
-            if(targetUri != null) {
-                DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
-                rescaledImage = getScaledBitmapFromUri(getContext(), targetUri);
+            Bitmap takenImage = (Bitmap) extras.get("data"); // Grabs the photo taken.
+
+            displayNewImage(targetUri, takenImage);
+        }
+    }
+
+    public void displayNewImage(Uri targetUri, Bitmap takenImage) {
+
+        Bitmap rescaledImage = takenImage;
+        if(targetUri != null) {
+            DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
+            rescaledImage = getScaledBitmapFromUri(getContext(), targetUri);
 //                imageView.setImageBitmap(photo);
-            } else {
-                Log.e("Rescaled", "DIDN'T WORK ");
-            }
+        } else {
+            Log.e("Rescaled", "DIDN'T WORK ");
+        }
 
-//            String[] split = mCurrentPhotoPath.toString().split("/"); // We need the full file title of the photo from this.
-
-//            try {
-//                // Send the full photo to the app created photo album
-//                savebitmap(takenImage, split[split.length-1]);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-
-//            Intent toGallery = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-//            File album = new File(Environment.getExternalStoragePublicDirectory(
-//                    Environment.DIRECTORY_PICTURES + File.separator + APP_TAG), split[split.length-1]);
-//            Uri content = Uri.fromFile(album);
-//            toGallery.setData(content);
-//            getActivity().sendBroadcast(toGallery);
-
-
-            // Make the thumbnail for the map
-            thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
-            String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + File.separator + mLastPhotoTimeStamp;
+        // Make the thumbnail for the map
+        thumbnail =  ThumbnailUtils.extractThumbnail(takenImage, 150, 150); // Makes the photo into a scaled thumbnail
+        Globals g = Globals.getInstance();
+        if(mLastLocation != null) {
             addToCluster(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
-//            insertMarker(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), takenImage);
-
 
             ByteArrayOutputStream bYtE = new ByteArrayOutputStream();
             takenImage.compress(Bitmap.CompressFormat.PNG, 100, bYtE);
@@ -872,6 +837,14 @@ public class MapsFragment extends Fragment
             mMessageDataBaseReference.push().setValue(newLocationMarker);
             mLastLocationMarker.setThumbnail(null); // erase the thumbnail saved so the picture isn't used again
         }
+    }
+
+    public void run() {
+        Globals g = Globals.getInstance();
+        File newImage = g.getImageToDisplay();
+        Uri targetUri = Uri.fromFile(newImage);
+        Bitmap bmp = BitmapFactory.decodeFile(newImage.getAbsolutePath());
+        displayNewImage(targetUri, bmp);
     }
 
     /**

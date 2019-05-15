@@ -26,6 +26,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mapsFragment = new MapsFragment();
+
+        Globals g = Globals.getInstance();
+        g.setMapsFragment(mapsFragment);
+
         getSupportFragmentManager().beginTransaction().add(R.id.content, mapsFragment).commit();
     }
 
