@@ -1,8 +1,10 @@
 package cs497.byu.trackme;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -14,6 +16,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -66,9 +69,12 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import cs497.byu.trackme.model.LocationMarker;
 import cs497.byu.trackme.model.ProfileData;
@@ -116,7 +122,7 @@ public class MapsFragment extends Fragment
     private LocationMarker mLastLocationMarker;
     private boolean isObserver;
     private ClusterManager<MarkerCluster> mClusterManager;
-    private Map<LatLng, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
+    private ConcurrentHashMap<LatLng, HashSet<Bitmap>> small_to_large_photos; // Key is the item Latlng as a string
     private Bitmap thumbnail;
 
 
@@ -133,6 +139,7 @@ public class MapsFragment extends Fragment
 
         attachDatabaseReadListener();
 
+        //added this
         updateValuesFromBundle(savedInstanceState);
 
         mStartButton = (Button) rootView.findViewById(R.id.startButton);
@@ -283,9 +290,10 @@ public class MapsFragment extends Fragment
 
     protected void startLocationUpdates() {
             mLocationRequest = new LocationRequest();
-            int numberOfSeconds = UPDATE_LOCATION_INTERVAL;
+            int numberOfSeconds = 5;
             mLocationRequest.setInterval(1000 * numberOfSeconds); //Preferred rate in milliseconds
             mLocationRequest.setFastestInterval(1000 * numberOfSeconds);
+
             mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
             if (ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this); //Request current location
@@ -310,10 +318,18 @@ public class MapsFragment extends Fragment
     public void onLocationChanged(Location location) {
 
         System.out.println("-=-=-=-=-=onLocationChanged");
+        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        if(mLastLocation != null){
+            double distanceLat = Math.abs(latLng.latitude - mLastLocation.getLatitude());
+            double distanceLng = Math.abs(latLng.latitude - mLastLocation.getLongitude());
+            if (distanceLat < 10 || distanceLng < 10 ) {
+                return;
+            }
+        }
         mLastLocation = location;
 
         //Place current location marker
-        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+
         System.out.println("-=-=-=-=-=onLocationChanged-=-=-=-=got a latlng");
 
         //Get the time
@@ -705,12 +721,13 @@ public class MapsFragment extends Fragment
         else {
             System.out.println("=-=-=-=-=-=small_to_large_photos NOT empty");
             double result = 0;
-            for (LatLng locationKey : small_to_large_photos.keySet()) {
+           for (LatLng locationKey : small_to_large_photos.keySet()) {
 //                float[] result = new float[1];
 //                Location.distanceBetween(locationKey.latitude, locationKey.longitude, currLoc.latitude, currLoc.longitude, result);
                 result = distanceBetween(locationKey.latitude, locationKey.longitude, currLoc.latitude, currLoc.longitude);
                 if (result <= 2) { // if distance between first and second location is less than 2m
                     small_to_large_photos.get(locationKey).add(image); // just add the image to the existing set
+
                 }
                 else {
                     HashSet<Bitmap> newSet = new HashSet<>(); // Create a new set to be inserted in to the map

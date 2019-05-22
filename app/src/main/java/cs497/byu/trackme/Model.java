@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Created by NAG on 3/21/18.
@@ -23,14 +25,14 @@ public class Model {
     public static Model SINGLETON = new Model();
 
     // Data members
-    private Map<LatLng, HashSet<Bitmap>> small_to_large_photos;
+    private ConcurrentHashMap<LatLng, HashSet<Bitmap>> small_to_large_photos;
     private List<Bitmap> allPictures; // All the pictures in the app will be saved to this list
     private LatLng lastLocationSaved;
 
 
     // Constructor
     private Model() {
-        small_to_large_photos = new HashMap<>();
+        small_to_large_photos = new ConcurrentHashMap<>();
         allPictures = new ArrayList<>();
         lastLocationSaved = null;
     }
@@ -51,11 +53,11 @@ public class Model {
     }
 
     // Getters and Setters
-    public Map<LatLng, HashSet<Bitmap>> getSmall_to_large_photos() {
+    public ConcurrentHashMap<LatLng, HashSet<Bitmap>> getSmall_to_large_photos() {
         return small_to_large_photos;
     }
 
-    public void setSmall_to_large_photos(Map<LatLng, HashSet<Bitmap>> small_to_large_photos) {
+    public void setSmall_to_large_photos(ConcurrentHashMap<LatLng, HashSet<Bitmap>> small_to_large_photos) {
         this.small_to_large_photos = small_to_large_photos;
     }
 

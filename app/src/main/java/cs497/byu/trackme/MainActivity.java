@@ -18,7 +18,6 @@ import com.google.firebase.udacity.friendlychat.R;
 public class MainActivity extends AppCompatActivity {
 
     private MapsFragment mapsFragment;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

@@ -58,22 +58,39 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryHolder> {
 
     @Override
     public void onBindViewHolder(GalleryHolder holder, int position) {
+        HashSet<Bitmap> map = small_to_large_photos.get(keyPosition);
 
+        boolean found = false;
+        int counter = 0;
+        for (Bitmap bitmap : map) {
+            if (counter == position) {
+                holder.setImageView(bitmap);
+                found = true;
+                break;
+            }
+            counter++;
+        }
+        if (!found) {
+            System.out.println("We have a problem");
+        }
+        /*
         for (Map.Entry<LatLng, HashSet<Bitmap>> map : small_to_large_photos.entrySet()) {
             if (keyPosition == map.getKey()) {
-                for (Bitmap image : map.getValue()) {
-
+               for (Bitmap image : map.getValue()) {
                     // This ensures that every image will be listed in the recycler view.
                     // If the image in the map, at the cooresponding Latlng, matches
-                    if (allPictures.get(position) == image) {
+                   if (allPictures.get(position) == image) {
                         holder.setImageView(image);
 
                     }
+
                 }
             }
 
 
         }
+        */
+        System.out.println("Item count is:::::::::::::::::::::::::" + getItemCount());
 
     }
 
