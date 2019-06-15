@@ -319,13 +319,6 @@ public class MapsFragment extends Fragment
 
         System.out.println("-=-=-=-=-=onLocationChanged");
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-        if(mLastLocation != null){
-            double distanceLat = Math.abs(latLng.latitude - mLastLocation.getLatitude());
-            double distanceLng = Math.abs(latLng.latitude - mLastLocation.getLongitude());
-            if (distanceLat < 10 || distanceLng < 10 ) {
-                return;
-            }
-        }
         mLastLocation = location;
 
         //Place current location marker
